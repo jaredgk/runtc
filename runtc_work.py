@@ -47,17 +47,19 @@ def main(argv):
     else:
         sys.stdout.write(str(args.force_override)+'\t'+str(isfile(rvcfname))+'\n')
 
-    msh_args = ['--vcf',vcfname]
+    msh_left_args = ['--vcf',vcfname]
+    msh_right_args = ['--vcf',rvcfname]
     if args.mapname is not None:
-        msh_args.extend(['--gen',args.mapname])
-    msh_left_args = msh_args + ['--dir','left']
+        msh_left_args.extend(['--gen',args.mapname])
+        msh_right_args.extend(['--gen',args.mapname])
+    msh_left_args.extend(['--dir','left'])
     leftmshfname = vcfname[0:vcfname.rfind(".vcf")]+"_left_results.txt"
     if args.force_override or not isfile(leftmshfname):
         sys.stdout.write(str(args.force_override)+'\t'+str(isfile(leftmshfname))+'\n')
         msh_from_vcf.getmsh(msh_left_args)
 
-    msh_right_args = msh_args + ['--dir','right']
-    rightreversedmshfname = rvcfname[0:rvcfname.rfind(".vcf")]+"_reversed_right_results.txt"
+    msh_right_args.extend(['--dir','right'])
+    rightreversedmshfname = rvcfname[0:rvcfname.rfind(".vcf")]+"_right_results.txt"
     if args.force_override or not isfile(rightreversedmshfname):
         msh_from_vcf.getmsh(msh_right_args)
 
