@@ -585,5 +585,3 @@ class datalist(list):
 ##print ("tc average likelihood estimate ", dl.tcest)
 ##dl.estimate_tc(estmethod = 'c')
 ##print ("tc composite likelihood estimate ", dl.tcest)
-
-

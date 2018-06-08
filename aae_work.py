@@ -52,8 +52,8 @@ def getl(f):
 
 def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
     d = None
-    l1 = (la1[idx] if la1 is not None else '-2:-2')
-    l2 = (la2[idx] if la2 is not None else '-2:-2')
+    l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
+    l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
     if gen_flag:
         d1 = intw(l1.split(':')[0])
         d2 = intw(l2.split(':')[0])
@@ -79,7 +79,8 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
             m1 += abs(prg-gen1)
         else:
             gen1 = inc1*rec
-            m1 += abs(prg-gen1)
+            sub_gen = mu*prp
+            m1 += abs(sub_gen-gen1)
     if d2 is not None and (not region_mode or d1 is None):
         pos2 = int(la2[0])
         inc2 = abs(prp-pos2)
@@ -89,7 +90,8 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
             m2 += abs(prg-gen2)
         else:
             gen2 = inc2*rec
-            m2 += abs(prg-gen2)
+            sub_gen = mu*prp
+            m2 += abs(sub_gen-gen2)
     d = data(dis1 = d1,dis2 = d2, morgans1 = m1, morgans2 = m2, rho1 = rec, rho2 = rec, mu=mu, model=mod)
     return d
 
@@ -146,7 +148,7 @@ def fullStr(dl):
         right_side = str(d.dis2)+','+str(d.morgans2)
     else:
         right_side = '-1,-1'
-    return left_side+','+right_side+','+str(dl.tcest)
+    return left_side+','+right_side+','+str(d.chi)+','+str(dl.tcest)
 
 def run(args):
     parser = createParser()
@@ -208,7 +210,7 @@ def run(args):
                 l1 = getl(fl)
                 la1 = l1.strip().split()
                 cur_left_pos = int(la1[0])
-            except StopIteration as si:
+            except IndexError as si:
                 break
         else:
             la1 = None
@@ -219,9 +221,12 @@ def run(args):
             cur_right_pos = int(la2[0])
             if has_genetic_positions:
                 cur_right_gen = float(la2[1])
-        except StopIteration as si:
+        except IndexError as si:
             if region_mode:
                 break
+            cur_right_pos = int(la1[0])
+            if has_genetic_positions:
+                cur_right_gen = float(la1[1])
             right_done = True
             la2 = None
         if start_idx != -1 and ii < start_idx:
@@ -250,7 +255,7 @@ def run(args):
                          prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen)
             if d is None:
                 if args.full_out:
-                    sys.stdout.write('\t-1,-1,-1,-1,-1')
+                    sys.stdout.write('\t-1,-1,-1,-1,-1,-1')
                 continue
             if len(dl1) == 0:
                 dl1.append(d)
@@ -266,6 +271,9 @@ def run(args):
         sys.stdout.write('\n')
         ii += 1
         prev_right_pos = cur_right_pos
+        prev_right_gen = cur_right_gen
+        if right_done:
+            break
 
 if __name__ == "__main__":
     run(sys.argv[1:])

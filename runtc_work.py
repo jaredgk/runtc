@@ -34,6 +34,8 @@ def splitArgsForEstimator(args):
     arglist.extend(['--rec',str(args.rec_rate)])
     if args.nosnp:
         arglist.extend(['--t0'])
+    if args.full_out:
+        arglist.extend(['--full-output'])
     return arglist
 
 
@@ -45,7 +47,7 @@ def main(argv):
     if args.force_override or not isfile(rvcfname):
         reversefile.reverse(argv[0],rvcfname)
     else:
-        sys.stdout.write(str(args.force_override)+'\t'+str(isfile(rvcfname))+'\n')
+        sys.stderr.write(str(args.force_override)+'\t'+str(isfile(rvcfname))+'\n')
 
     msh_left_args = ['--vcf',vcfname]
     msh_right_args = ['--vcf',rvcfname]
@@ -55,7 +57,7 @@ def main(argv):
     msh_left_args.extend(['--dir','left'])
     leftmshfname = vcfname[0:vcfname.rfind(".vcf")]+"_left_results.txt"
     if args.force_override or not isfile(leftmshfname):
-        sys.stdout.write(str(args.force_override)+'\t'+str(isfile(leftmshfname))+'\n')
+        sys.stderr.write(str(args.force_override)+'\t'+str(isfile(leftmshfname))+'\n')
         msh_from_vcf.getmsh(msh_left_args)
 
     msh_right_args.extend(['--dir','right'])
