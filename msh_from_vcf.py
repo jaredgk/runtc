@@ -10,7 +10,7 @@ def createParser():
     parser.add_argument("--sub",dest="subname")
     parser.add_argument("--out",dest="outname")
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
-    parser.add_argument("--squish",dest="squish",action="store_true")
+    parser.add_argument("--nosquish",dest="squish",action="store_false")
     return parser
 
 def splitAllelesAll(la):
@@ -167,6 +167,38 @@ def getGenPos(pos,l1,l2,cm=True):
     return rate*l2[i-1]+gr*float(pos-l1[i-1])
 
 
+def readsubfile(subname):
+    """
+        reads a file that contains a series of integers
+        returns a list of integers
+        should work regardless of what separates the integers
+    """
+    sf = open(subname,'r')
+    idx_list = []
+    inint = False
+    cc = ''
+    while True:
+        c = sf.read(1)
+        if c:
+            if c.isdigit():
+                if inint:
+                    cc += c
+                else:
+                    cc = c
+                inint = True
+            else:
+                if inint:
+                    idx_list.append(int(cc))
+                    cc = ''
+                    inint = False
+        else:
+            if inint:
+                idx_list.append(int(cc))
+            break
+    sf.close()
+    return idx_list
+
+
 def getmsh(args):
     parser = createParser()
     args = parser.parse_args(args)
@@ -181,8 +213,9 @@ def getmsh(args):
 
     idx_list = None
     if args.subname is not None:
-        sf = open(args.subname,'r')
-        idx_list = [int(i.strip()) for i in sf]
+        #sf = open(args.subname,'r')
+        #idx_list = [int(i.strip()) for i in sf]
+        idx_list = readsubfile(args.subname)
         sub_flag = True
     compressed_mode = False
     if args.vcfname[-3:] == '.gz':
@@ -198,8 +231,10 @@ def getmsh(args):
     gen_list = None
     if gen_flag:
         gen_list = []
-
-    outfn = args.outname
+    if args.outname is not None:
+        outfn = args.outname
+    else:
+        raise Exception("--out option required for msh_to_vcf")
     if outfn[-3:] == '.gz':
         compress_out = True
         outf = gzip.open(outfn,"w")

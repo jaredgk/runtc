@@ -23,6 +23,7 @@ def createParser():
     parser.add_argument("--full-output",dest="full_out",action="store_true")
     parser.add_argument("--region-mode",dest="region_mode",action="store_true")
     parser.add_argument("--side-check",dest="side_check",action="store_true")
+    parser.add_argument("--outfn",dest="outfilename",type=str)
     return parser
 
 def genFunction(val):
@@ -53,7 +54,7 @@ def getl(f):
     except AttributeError:
         return l
 
-def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
+def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,forceleftnone=None,forcerightnone=None):
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
@@ -95,6 +96,12 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
         m1 = genFunction(m1)
     if mod_gen and m2 is not None:
         m2 = genFunction(m2)
+    if forceleftnone:
+        d1 = m1 = None
+    if forcerightnone:
+        d2 = m2 = None
+    if d1 is None and d2 is None:
+        return d
     d = data(dis1 = d1,dis2 = d2, morgans1 = m1, morgans2 = m2, rho1 = rec, rho2 = rec, mu=mu, model=mod)
     return d
 
@@ -123,7 +130,14 @@ def getActiveIdx(firstla,start_inds):
             idx_list.append(i)
     return idx_list
 
-
+def hasmissing(la,idx_list):
+    anymissing = False
+    for i in idx_list:
+        a = la[i]
+        if a[0:2] == '-2':
+            anymissing = True
+            break
+    return anymissing
 
 def getGenMap(f):
     l1 = []
@@ -190,7 +204,7 @@ def run(args):
     mu = args.mut_rate
     rec = args.rec_rate
 
-    n_model = args.n_model
+    #n_model = args.n_model
     n0_model = args.n0_model
 
 
@@ -206,6 +220,7 @@ def run(args):
     start_inds = 1
     if has_genetic_positions:
         start_inds = 2
+    n_model = input_length - start_inds
     prev_right_pos = None
     prev_right_gen = None
     prev_right_pos = int(la2[0])
@@ -219,6 +234,11 @@ def run(args):
 
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
+
+    if args.outfilename:
+        outf = open(args.outfilename,'w')
+    else:
+        outf = sys.stdout
 
     while True:
         check_left = (region_mode or ii != 0)
@@ -259,20 +279,22 @@ def run(args):
         #    cur_right_pos = int(la1[0])
 
         if region_mode:
-            sys.stdout.write(str(prev_right_pos)+'-'+str(cur_right_pos))
+            outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
         else:
-            sys.stdout.write(str(prev_right_pos))
+            outf.write(str(prev_right_pos))
         ppp,qqq = 0,0
         if la1 is not None:
             ppp = int(la1[0])
         if la2 is not None:
             qqq = int(la2[0])
+        hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
+        hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
         for i in range(start_inds,input_length):
             d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
-                         prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen)
+                         prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
             if d is None:
                 if args.full_out:
-                    sys.stdout.write('\t-1,-1,-1,-1,-1,-1')
+                    outf.write('\t-1,-1,-1,-1,-1,-1')
                 continue
             if len(dl1) == 0:
                 dl1.append(d)
@@ -282,17 +304,18 @@ def run(args):
                 dl1.estimate_tc_cache(cache=args,round=args.round,bin=args.bin)
                 est_list_ml.append(dl1.tcest)
                 if args.full_out:
-                    sys.stdout.write('\t'+fullStr(dl1))
+                    outf.write('\t'+fullStr(dl1))
         est_all_ml = geomean(est_list_ml)
-        sys.stdout.write('\t'+str(est_all_ml))
-        sys.stdout.write('\n')
+        outf.write('\t'+str(est_all_ml))
+        outf.write('\n')
         ii += 1
         prev_right_pos = cur_right_pos
         if has_genetic_positions:
             prev_right_gen = cur_right_gen
         if right_done:
             break
-    sys.stderr.write("Cache: %d of %d hits (%f rate)" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/float(dl1.cache_total)))
+    if args.cache:
+        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/float(dl1.cache_total)))
 
 if __name__ == "__main__":
     run(sys.argv[1:])
