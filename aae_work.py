@@ -16,10 +16,13 @@ def createParser():
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
     parser.add_argument("--t0",dest="nosnp",action="store_true")
-    parser.add_argument("--no-cache",dest="cache_est",action="store_false")
+    parser.add_argument("--nocache",dest="cache",action="store_false")
+    parser.add_argument("--bin",dest="bin",action="store_true")
+    parser.add_argument("--round",dest="round",type=int,default=-1)
     parser.add_argument("--mod-gen",dest="mod_gen",action="store_true")
     parser.add_argument("--full-output",dest="full_out",action="store_true")
     parser.add_argument("--region-mode",dest="region_mode",action="store_true")
+    parser.add_argument("--side-check",dest="side_check",action="store_true")
     return parser
 
 def genFunction(val):
@@ -64,10 +67,6 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
         d2 = intw(l2)
         m1 = (d1*rec if d1 is not None else None)
         m2 = (d2*rec if d2 is not None else None)
-    if mod_gen and m1 is not None:
-        m1 = genFunction(m1)
-    if mod_gen and m2 is not None:
-        m2 = genFunction(m2)
     if d1 is None and d2 is None:
         return d
     if d1 is not None:
@@ -92,6 +91,10 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False):
             gen2 = inc2*rec
             sub_gen = mu*prp
             m2 += abs(sub_gen-gen2)
+    if mod_gen and m1 is not None:
+        m1 = genFunction(m1)
+    if mod_gen and m2 is not None:
+        m2 = genFunction(m2)
     d = data(dis1 = d1,dis2 = d2, morgans1 = m1, morgans2 = m2, rho1 = rec, rho2 = rec, mu=mu, model=mod)
     return d
 
@@ -112,6 +115,15 @@ def parseGenLine(l,offset):
     a = float(la[0])
     b = float(la[1+offset])
     return a,b
+
+def getActiveIdx(firstla,start_inds):
+    idx_list = []
+    for i in range(start_inds,len(firstla)):
+        if firstla[i][0:2] != '-2':
+            idx_list.append(i)
+    return idx_list
+
+
 
 def getGenMap(f):
     l1 = []
@@ -153,7 +165,6 @@ def fullStr(dl):
 def run(args):
     parser = createParser()
     args = parser.parse_args(args)
-
     #fnl = str(sys.argv[1])
     if args.left_file[-3:] == '.gz':
         fl = gzip.open(args.left_file,'r')
@@ -201,7 +212,13 @@ def run(args):
     if has_genetic_positions:
         prev_right_gen = float(la2[1])
 
+    if args.side_check:
+        idx_list = getActiveIdx(la2,start_inds)
+
     mc = fitmodel(n=n_model,N0=n0_model,popmodel="c",nosnp = args.nosnp)
+
+    if args.bin:
+        dl1.calc_tc_bins(1e-9,10,mu,mc)
 
     while True:
         check_left = (region_mode or ii != 0)
@@ -232,7 +249,7 @@ def run(args):
         if start_idx != -1 and ii < start_idx:
             ii += 1
             continue
-        elif start_idx != -1 and ii >= end_idx:
+        elif end_idx != -1 and ii >= end_idx:
             break
 
         est_list_ml = []
@@ -262,7 +279,7 @@ def run(args):
             else:
                 dl1[0] = d
             if len(dl1) != 0:
-                dl1.estimate_tc_cache(cache_est=args.cache_est)
+                dl1.estimate_tc_cache(cache=args,round=args.round,bin=args.bin)
                 est_list_ml.append(dl1.tcest)
                 if args.full_out:
                     sys.stdout.write('\t'+fullStr(dl1))
@@ -271,9 +288,11 @@ def run(args):
         sys.stdout.write('\n')
         ii += 1
         prev_right_pos = cur_right_pos
-        prev_right_gen = cur_right_gen
+        if has_genetic_positions:
+            prev_right_gen = cur_right_gen
         if right_done:
             break
+    sys.stderr.write("Cache: %d of %d hits (%f rate)" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/float(dl1.cache_total)))
 
 if __name__ == "__main__":
     run(sys.argv[1:])

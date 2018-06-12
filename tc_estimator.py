@@ -105,6 +105,13 @@ def gammafunc(*arg):
     else:
         return gamma(a)* (1-gammainc(a,x))
 
+def roundChi(f,n):
+    """
+    Rounds chi to 14 digits after decimal, which fixes some caching errors
+    """
+    if n < 1:
+        raise Exception("N value %d is not valid" % (n))
+    return round(f,-int(math.floor(math.log10(f)))+(n-1))
 
 class fitmodel:
     """
@@ -247,7 +254,7 @@ class data:
                 dobayes is a boolean for whether the prior should be used or not (default is False)
     """
 
-    def __init__(self,dis1 = None, dis2=None, rho1 = None, rho2 = None, mu = None, morgans1 = None, morgans2 = None, model = None, side = None):
+    def __init__(self,dis1 = None, dis2=None, rho1 = None, rho2 = None, mu = None, morgans1 = None, morgans2 = None, model = None, side = None, chi = None):
         """
             must have either   rho1,morgans1,dis1 all defined, or rho2,morgans2,dis2 all defined, or both
         """
@@ -266,7 +273,14 @@ class data:
         if mu == None:
             mu = 0.0  # do not use mutation distance in the method
         self.mu = mu
-
+        if chi is not None:
+            self.chi = chi
+            self.side = side
+            if side == 3:
+                self.singlex = False
+            else:
+                self.singlex = True
+            return
         if self.morgans1 == None and self.rho1 != None and  self.dis1 != None:
             self.morgans1 = self.rho1 * self.dis1
         if self.morgans2 == None and self.rho2 != None and  self.dis2 != None:
@@ -279,13 +293,13 @@ class data:
             exit()
 
         if self.morgans1 == None or self.dis1 == None:  ## data only from side 2
-            assert self.morgans2 != None and self.dis2 != None and self.morgans2 > 0 and self.dis2 > 0
+            #assert self.morgans2 != None and self.dis2 != None and self.morgans2 > 0 and self.dis2 > 0
             self.side = 2
             self.singlex = True
             self.chi = (mu * (self.dis2) + self.morgans2 )
         else:
             if self.morgans2 == None or self.dis2 == None: ## data only from side 1
-                assert self.morgans1 != None and self.dis1 != None and self.morgans1 > 0 and self.dis1 > 0
+                #assert self.morgans1 != None and self.dis1 != None and self.morgans1 > 0 and self.dis1 > 0
                 self.side = 1
                 self.singlex = True
                 self.chi = (mu * (self.dis1) + self.morgans1 )
@@ -450,6 +464,12 @@ class datalist(list):
     def __init__(self):
         self.cache = {}
         self.cache_single = {}
+        self.bins = []
+        self.bins_single = []
+        self.estimates_bin = []
+        self.estimates_bin_single = []
+        self.cache_hits = 0
+        self.cache_total = 0
 
     def append(self, item):
         if not isinstance(item, data):
@@ -523,24 +543,77 @@ class datalist(list):
             print("estimation method ",estmethod," not recognized")
             exit()
 
-    def estimate_tc_cache(self,cache_est=True):
+    #Cache options: basic, bin, round, none
+    def estimate_tc_cache(self,cache=True,round=-1,bin=False):
         chi = self[0].chi
-        if self[0].singlex:
-            if cache_est and str(chi) in self.cache_single:
-                self.tcest = self.cache_single[str(chi)][0]
-                self.loglike = self.cache_single[str(chi)][1]
+        if round != -1:
+            chi = roundChi(chi,round)
+        fill_cache = False
+        if cache:
+            if self[0].singlex and str(chi) in self.cache_single:
+                self.tcest = self.cache_single[str(chi)]
+                self.cache_hits += 1
+            elif not self[0].singlex and str(chi) in self.cache:
+                self.tcest = self.cache[str(chi)]
+                self.cache_hits += 1
             else:
-                self.estimate_tc(dobayes=False)
-                cache_vals = [self.tcest,self.loglike]
-                self.cache_single[str(chi)] = cache_vals
+                fill_cache = True
+            self.cache_total += 1
+        if bin:
+            self.estimate_tc_bin()
         else:
-            if cache_est and str(chi) in self.cache:
-                self.tcest = self.cache[str(chi)][0]
-                self.loglike = self.cache[str(chi)][1]
+            self.estimate_tc(dobayes=False)
+        if fill_cache:
+            if self[0].singlex:
+                self.cache_single[str(chi)] = self.tcest
             else:
-                self.estimate_tc(dobayes=False)
-                cache_vals = [self.tcest,self.loglike]
-                self.cache[str(chi)] = cache_vals
+                self.cache[str(chi)] = self.tcest
+
+    def calc_tc_bins(self,start,stop,mu,model,num=10000):
+        self.bins = list(np.geomspace(start,stop,num))
+        self.bins_single = list(np.geomspace(start,stop,num))
+        for val in self.bins:
+            d = data(mu=mu,model=model,chi=val,side=3)
+            d.estimate_tc(dobayes=False)
+            self.estimates_bin.append(d.tcest)
+        for val in self.bins_single:
+            d = data(mu=mu,model=model,chi=val,side=2)
+            d.estimate_tc(dobayes=False)
+            self.estimates_bin_single.append(d.tcest)
+
+    def estimate_tc_bin(self):
+        chi = self[0].chi
+        idx = self.getBinIdx(chi)
+        self.tcest = self.getIntEst(chi,idx,self[0].singlex)
+
+
+    def getBinIdx(self,chi):
+        if len(self.bins) == 0:
+            raise Exception("Bins have not been initiated")
+        if chi < self.bins[0]:
+            raise Exception("Chi value %f is lower than minimum in bins %f" % (chi,self.bins[0]))
+        if chi > self.bins[-1]:
+            raise Exception("Chi value %f is higher than maximum in bins %f" % (chi,self.bins[-1]))
+        min_idx = 0
+        max_idx = len(self.bins)-2
+        while True:
+            if max_idx < min_idx:
+                raise Exception("Error finding region for chi")
+            m = (min_idx+max_idx)//2
+            if self.bins[m] <= chi < self.bins[m+1]:
+                return m
+            elif self.bins[m] > chi:
+                max_idx = m-1
+            else:
+                min_idx = m + 1
+
+
+    def getIntEst(self,chi,idx,singlex):
+        s = chi - self.bins[idx]
+        s /= (self.bins[idx+1]-self.bins[idx])
+        if singlex:
+            return s*self.estimates_bin_single[idx]+(1-s)*self.estimates_bin_single[idx+1]
+        return s*self.estimates_bin[idx]+(1-s)*self.estimates_bin[idx+1]
 
 
 ##some examples  comment out when using as a module

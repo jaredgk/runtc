@@ -8,7 +8,7 @@ def createParser():
     parser.add_argument("--gen",dest="genname")
     parser.add_argument("--vcf",dest="vcfname")
     parser.add_argument("--sub",dest="subname")
-    parser.add_argument("--dir",dest="direction")
+    parser.add_argument("--out",dest="outname")
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
     parser.add_argument("--squish",dest="squish",action="store_true")
     return parser
@@ -34,6 +34,11 @@ def splitAllelesAll(la):
     if ac == 1 or ac == an - 1:
         return []
     return alleles
+
+def writeToFile(outf,write_line,compress_out):
+    if compress_out:
+        write_line = write_line.encode()
+    outf.write(write_line)
 
 def splitAllelesSub(la,idx_list):
     alleles = []
@@ -143,7 +148,7 @@ def getGenMap(f,idx=0,squish=False):
                 a,b = parseGenLine(la,idx)
         #if b != 0:
         #For future: Use last position with 0.0 cm instead of first
-        if not squish or (len(l2) > 0 and l2[-1] != b):
+        if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
             l1.append(a)
             l2.append(b)
     return l1,l2
@@ -179,23 +184,32 @@ def getmsh(args):
         sf = open(args.subname,'r')
         idx_list = [int(i.strip()) for i in sf]
         sub_flag = True
-
+    compressed_mode = False
+    if args.vcfname[-3:] == '.gz':
+        compressed_mode = True
+        vcf = gzip.open(args.vcfname,'r')
+    else:
+        vcf = open(args.vcfname,'r')
     a_mat = []
     d_mat = []
     m_mat = []
-
     k = 0
     pos_list = []
     gen_list = None
     if gen_flag:
         gen_list = []
 
-    if args.direction.lower() == "right":
-        outfn = args.vcfname[0:args.vcfname.rfind(".vcf")]+"_right_results.txt"
+    outfn = args.outname
+    if outfn[-3:] == '.gz':
+        compress_out = True
+        outf = gzip.open(outfn,"w")
     else:
-        outfn = args.vcfname[0:args.vcfname.rfind(".vcf")]+"_left_results.txt"
-    outf = open(outfn,"w")
-    for line in open(args.vcfname):
+        compress_out = False
+        outf = open(outfn,"w")
+    sys.stderr.write(args.vcfname+'\t'+outfn+'\n')
+    for line in vcf:
+        if compressed_mode:
+            line = line.decode()
         if line[0] == '#':
             continue
         la = line.strip().split()
@@ -224,14 +238,19 @@ def getmsh(args):
         if gen_flag:
             g_vec = msh(a,d,k+1,gen_list)
         #tv = [str(ll) for ll in sorted(msh_vec)]
-        outf.write(str(pos_list[-1]))
+        #outf.write(str(pos_list[-1]))
+        writeToFile(outf,str(pos_list[-1]),compress_out)
         if gen_flag:
-            outf.write('\t'+str(gen_list[-1]))
+            writeToFile(outf,'\t'+str(gen_list[-1]),compress_out)
+            #outf.write('\t'+str(gen_list[-1]))
         for i in range(len(msh_vec)):
-            outf.write('\t'+str(msh_vec[i]))
+            writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
+            #outf.write('\t'+str(msh_vec[i]))
             if gen_flag:
-                outf.write(':'+str(g_vec[i]))
-        outf.write('\n')
+                writeToFile(outf,':'+str(g_vec[i]),compress_out)
+                #outf.write(':'+str(g_vec[i]))
+        writeToFile(outf,'\n',compress_out)
+        #outf.write('\n')
 
         a_prev = a
         d_prev = d
