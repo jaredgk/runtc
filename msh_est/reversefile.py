@@ -63,7 +63,7 @@ def linecount(filename):
     return lines
 
 
-def reverse(fname,frevname,doprint = None):
+def reverse_file(fname,frevname,doprint = None):
     if doprint:
         print(fname,"has",linecount(fname),"lines")
     frout = open(frevname,"w")

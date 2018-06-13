@@ -96,10 +96,10 @@ def main(argv):
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
-        temp_pypy_str = "\"import reversefile; reversefile.reverse('%s','%s')\" "%(vcfname,rvcfname)
+        temp_pypy_str = "\"import reversefile; reversefile.reverse_file('%s','%s')\" "%(vcfname,rvcfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s"""%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            reversefile.reverse(vcfname,rvcfname)
+            reversefile.reverse_file(vcfname,rvcfname)
 
     msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
     if args.force_override or not isfile(leftmshfname):
@@ -126,10 +126,10 @@ def main(argv):
 
     if args.force_override or not isfile(rightmshfname):
         sys.stderr.write("Reversing right lengths\n")
-        temp_pypy_str = "\"import reversefile;  reversefile.reverse('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
+        temp_pypy_str = "\"import reversefile;  reversefile.reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            reversefile.reverse(rightreversedmshfname,rightmshfname)
+            reversefile.reverse_file(rightreversedmshfname,rightmshfname)
 
     est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
     sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
