@@ -133,7 +133,7 @@ def main(argv):
 
     est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
     sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
-    aae_work.run(est_args)
+    aae_work.run_estimator(est_args)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
