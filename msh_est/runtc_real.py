@@ -1,12 +1,17 @@
 import os
 import sys
-import msh_from_vcf
-import reversefile
+#import msh_from_vcf
+#import reversefile
 #import aae_work
 import argparse
 from os.path import isfile
 import subprocess
-from msh_est import reverse_file,getmsh,run_estimator
+try:
+    from msh_est import reverse_file,getmsh,run_estimator
+except:
+    from msh_from_vcf import getmsh
+    from reversefile import reverse_file
+    from aae_work import run_estimator
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -100,7 +105,7 @@ def main(argv):
         temp_pypy_str = "\"from msh_est import reverse_file; reverse_file('%s','%s')\" "%(vcfname,rvcfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s"""%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            reversefile.reverse_file(vcfname,rvcfname)
+            reverse_file(vcfname,rvcfname)
 
     msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
     if args.force_override or not isfile(leftmshfname):
@@ -112,7 +117,7 @@ def main(argv):
         temp_pypy_str = "\"from msh_est import getmsh;  get_msh(%s)\""%temp_args_str
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            msh_from_vcf.getmsh(msh_left_args)
+            getmsh(msh_left_args)
 
     if args.force_override or not isfile(rightreversedmshfname):
         sys.stderr.write("Creating right lengths: %s\n" % (str(msh_right_args)))
@@ -123,18 +128,18 @@ def main(argv):
         temp_pypy_str = "\"from msh_est import getmsh;  getmsh(%s)\""%temp_args_str
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            msh_from_vcf.getmsh(msh_right_args)
+            getmsh(msh_right_args)
 
     if args.force_override or not isfile(rightmshfname):
         sys.stderr.write("Reversing right lengths\n")
         temp_pypy_str = "\"from msh_est import reversefile;  reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
-            reversefile.reverse_file(rightreversedmshfname,rightmshfname)
+            reverse_file(rightreversedmshfname,rightmshfname)
 
     est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
     sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
-    aae_work.run_estimator(est_args)
+    run_estimator(est_args)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
