@@ -2,10 +2,11 @@ import os
 import sys
 import msh_from_vcf
 import reversefile
-import aae_work
+#import aae_work
 import argparse
 from os.path import isfile
 import subprocess
+from msh_est import reverse_file,getmsh,run_estimator
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -96,7 +97,7 @@ def main(argv):
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
-        temp_pypy_str = "\"import reversefile; reversefile.reverse_file('%s','%s')\" "%(vcfname,rvcfname)
+        temp_pypy_str = "\"from msh_est import reverse_file; reverse_file('%s','%s')\" "%(vcfname,rvcfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s"""%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
             reversefile.reverse_file(vcfname,rvcfname)
@@ -108,7 +109,7 @@ def main(argv):
         for a in msh_left_args:
             temp_args_str += "\'%s\',"%a
         temp_args_str = temp_args_str[:-1] + ']'  # replace ',' on end with ']'
-        temp_pypy_str = "\"import msh_from_vcf;  msh_from_vcf.getmsh(%s)\""%temp_args_str
+        temp_pypy_str = "\"from msh_est import getmsh;  get_msh(%s)\""%temp_args_str
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
             msh_from_vcf.getmsh(msh_left_args)
@@ -119,14 +120,14 @@ def main(argv):
         for a in msh_right_args:
             temp_args_str += "\'%s\',"%a
         temp_args_str = temp_args_str[:-1] + ']' # replace ',' on end with ']'
-        temp_pypy_str = "\"import msh_from_vcf;  msh_from_vcf.getmsh(%s)\""%temp_args_str
+        temp_pypy_str = "\"from msh_est import getmsh;  getmsh(%s)\""%temp_args_str
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
             msh_from_vcf.getmsh(msh_right_args)
 
     if args.force_override or not isfile(rightmshfname):
         sys.stderr.write("Reversing right lengths\n")
-        temp_pypy_str = "\"import reversefile;  reversefile.reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
+        temp_pypy_str = "\"from msh_est import reversefile;  reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
         temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
         if temp_subprocess_return:
             reversefile.reverse_file(rightreversedmshfname,rightmshfname)

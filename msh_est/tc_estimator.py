@@ -559,10 +559,11 @@ class datalist(list):
             else:
                 fill_cache = True
             self.cache_total += 1
-        if bin:
-            self.estimate_tc_bin()
-        else:
-            self.estimate_tc(dobayes=False)
+        if not cache or fill_cache:
+            if bin:
+                self.estimate_tc_bin()
+            else:
+                self.estimate_tc(dobayes=False)
         if fill_cache:
             if self[0].singlex:
                 self.cache_single[str(chi)] = self.tcest
