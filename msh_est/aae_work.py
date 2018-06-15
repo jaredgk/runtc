@@ -24,6 +24,7 @@ def createParser():
     parser.add_argument("--region-mode",dest="region_mode",action="store_true")
     parser.add_argument("--side-check",dest="side_check",action="store_true")
     parser.add_argument("--outfn",dest="outfilename",type=str)
+    parser.add_argument("--positions",dest="posname",type=str)
     return parser
 
 def genFunction(val):
@@ -193,13 +194,18 @@ def run_estimator(args):
     else:
         fr = open(args.right_file,'r')
 
+    position_mode = False
+    if args.posname is not None:
+        posf = open(args.posname,'r')
+        pos_list = [int(l.strip()) for l in posf]
+        pos_idx = 0
+        position_mode = True
+
     region_mode = args.region_mode
 
 
     start_idx = args.start
     end_idx = args.end
-
-
 
     mu = args.mut_rate
     rec = args.rec_rate
@@ -211,6 +217,7 @@ def run_estimator(args):
     ii = 0
     has_genetic_positions = False
     right_done = False
+
     dl1 = datalist()
 
     l2 = getl(fr)
@@ -226,6 +233,9 @@ def run_estimator(args):
     prev_right_pos = int(la2[0])
     if has_genetic_positions:
         prev_right_gen = float(la2[1])
+    if position_mode:
+        while pos_idx < len(pos_list) and pos_list[pos_idx] < prev_right_pos:
+            pos_idx += 1
 
     if args.side_check:
         idx_list = getActiveIdx(la2,start_inds)
@@ -273,28 +283,34 @@ def run_estimator(args):
             break
 
         est_list_ml = []
-        #if not right_done:
-        #    cur_right_pos = int(la2[0])
-        #else: #only gets here in snp mode
-        #    cur_right_pos = int(la1[0])
+
+        if position_mode and pos_list[pos_idx] > cur_right_pos:
+            ii += 1
+            prev_right_pos = cur_right_pos
+            if has_genetic_positions:
+                prev_right_gen = cur_right_gen
+            if right_done:
+                break
+            continue
 
         if region_mode:
-            outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
+            if position_mode:
+                outf.write(str(pos_list[pos_idx]))
+            else:
+                outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
         else:
             outf.write(str(prev_right_pos))
-        ppp,qqq = 0,0
-        if la1 is not None:
-            ppp = int(la1[0])
-        if la2 is not None:
-            qqq = int(la2[0])
+
         hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
         hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
+        est_str = ''
         for i in range(start_inds,input_length):
             d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
                          prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
             if d is None:
                 if args.full_out:
-                    outf.write('\t-1,-1,-1,-1,-1,-1')
+                    est_str += '\t-1,-1,-1,-1,-1,-1'
+                    #outf.write('\t-1,-1,-1,-1,-1,-1')
                 continue
             if len(dl1) == 0:
                 dl1.append(d)
@@ -304,10 +320,20 @@ def run_estimator(args):
                 dl1.estimate_tc_cache(cache=args,round=args.round,bin=args.bin)
                 est_list_ml.append(dl1.tcest)
                 if args.full_out:
-                    outf.write('\t'+fullStr(dl1))
+                    est_str += ('\t'+fullStr(dl1))
+                    #outf.write('\t'+fullStr(dl1))
         est_all_ml = geomean(est_list_ml)
-        outf.write('\t'+str(est_all_ml))
-        outf.write('\n')
+        est_str += ('\t'+str(est_all_ml)+'\n')
+        #outf.write('\t'+str(est_all_ml))
+        #outf.write('\n')
+        outf.write(est_str)
+        if position_mode:
+            pos_idx += 1
+            while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:
+                outf.write(str(pos_list[pos_idx])+est_str)
+                pos_idx += 1
+            if pos_idx == len(pos_list):
+                break
         ii += 1
         prev_right_pos = cur_right_pos
         if has_genetic_positions:

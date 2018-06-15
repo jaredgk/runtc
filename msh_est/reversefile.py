@@ -8,6 +8,9 @@
 
 import sys
 import os
+import gzip
+
+
 
 
 def reverse_readline(filename, buf_size=8192):
@@ -62,15 +65,27 @@ def linecount(filename):
 
     return lines
 
+def writeSwitch(l,compress_out):
+    if compress_out:
+        try:
+            return l.encode()
+        except:
+            return l
+    return l
 
 def reverse_file(fname,frevname,doprint = None):
     if doprint:
         print(fname,"has",linecount(fname),"lines")
-    frout = open(frevname,"w")
+    compress_out = False
+    if frevname[-3:] == '.gz':
+        frout = gzip.open(frevname,'w')
+        compress_out = True
+    else:
+        frout = open(frevname,"w")
     i = 0
     lineintervaloutput = 1000000
     for rline in reverse_readline(fname):
-        frout.write(rline.strip()+"\n")   # strip in case leftover \n or \r
+        frout.write(writeSwitch(rline.strip()+'\n',compress_out))   # strip in case leftover \n or \r
         i += 1
         if doprint:
             if i == lineintervaloutput * (i//lineintervaloutput):
@@ -84,5 +99,3 @@ if __name__ == "__main__":
         reverse(fname,frevname,doprint = True)
     else:
         print("usage: python reversefile.py filename1  filname2\n  filename1 is the name of the file to be reversed\n  filename2 is the name of the reversed file")
-
-

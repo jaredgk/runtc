@@ -6,12 +6,15 @@ import sys
 import argparse
 from os.path import isfile
 import subprocess
-try:
-    from msh_est import reverse_file,getmsh,run_estimator
-except:
-    from msh_from_vcf import getmsh
-    from reversefile import reverse_file
-    from aae_work import run_estimator
+#try:
+#    from msh_est import reverse_file,getmsh,run_estimator
+#except:
+#    sys.stderr.write("msh_est not found, using local files\n")
+from msh_from_vcf import getmsh
+from reversefile import reverse_file
+from aae_work import run_estimator
+
+PYPY_VERSION="pypy3"
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -37,6 +40,8 @@ def createParser():
     parser.add_argument("--bin",dest="bin",action="store_true",help="Calculate estimates by linear interpolation of geometrically-distributed pre-calculated estimates")
     parser.add_argument("--round",dest="round",type=int,default=-1,help="Round chi values to set number of significant digits for caching")
     parser.add_argument("--side-check",dest="side_check",action="store_true",help="Use only one-sided estimator if any chromosomes at a site are missing a side")
+    parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Will compress msh files and delete intermediate reversed length file")
+    parser.add_argument("--positions",dest="posname",type=str,help="List of positions that should output regions for")
     return parser
 
 def splitArgsForEstimator(args):
@@ -63,6 +68,10 @@ def splitArgsForEstimator(args):
         arglist.extend(['--outfn',str(args.outest)])
     if args.side_check:
         arglist.extend(['--side-check'])
+    if args.region_mode:
+        arglist.extend(['--region-mode'])
+    if args.posname is not None:
+        arglist.extend(['--positions',str(args.posname)])
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -75,6 +84,9 @@ def splitArgsForLengths(args,rvcfname):
         mshtag = vcftag
     leftmshfname = mshtag+"_left_lengths.txt"
     rightmshfname = mshtag+"_right_lengths.txt"
+    if args.gzip_check:
+        leftmshfname += ".gz"
+        rightmshfname += ".gz"
     rightreversedmshfname = mshtag+"_reversed_right_lengths.txt"
     msh_left_args.extend(['--out',leftmshfname])
     msh_right_args.extend(['--out',rightreversedmshfname])
@@ -102,9 +114,10 @@ def main(argv):
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
-        temp_pypy_str = "\"from msh_est import reverse_file; reverse_file('%s','%s')\" "%(vcfname,rvcfname)
-        temp_subprocess_return = subprocess.run("""pypy3 -c %s"""%(temp_pypy_str),shell=True)
-        if temp_subprocess_return:
+        temp_pypy_str = "\"from reversefile import reverse_file; reverse_file('%s','%s')\" "%(vcfname,rvcfname)
+        temp_subprocess_return = subprocess.run("""%s -c %s"""%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if temp_subprocess_return.returncode != 0:
+            sys.stderr.write("Running without pypy\n")
             reverse_file(vcfname,rvcfname)
 
     msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
@@ -114,28 +127,33 @@ def main(argv):
         for a in msh_left_args:
             temp_args_str += "\'%s\',"%a
         temp_args_str = temp_args_str[:-1] + ']'  # replace ',' on end with ']'
-        temp_pypy_str = "\"from msh_est import getmsh;  get_msh(%s)\""%temp_args_str
-        temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
-        if temp_subprocess_return:
+        temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
+        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if temp_subprocess_return.returncode != 0:
+            sys.stderr.write("Running without pypy\n")
             getmsh(msh_left_args)
 
-    if args.force_override or not isfile(rightreversedmshfname):
+    if args.force_override or (not isfile(rightreversedmshfname) and not isfile(rightmshfname)):
         sys.stderr.write("Creating right lengths: %s\n" % (str(msh_right_args)))
         temp_args_str = "["
         for a in msh_right_args:
             temp_args_str += "\'%s\',"%a
         temp_args_str = temp_args_str[:-1] + ']' # replace ',' on end with ']'
-        temp_pypy_str = "\"from msh_est import getmsh;  getmsh(%s)\""%temp_args_str
-        temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
-        if temp_subprocess_return:
+        temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
+        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if temp_subprocess_return.returncode != 0:
+            sys.stderr.write("Running without pypy\n")
             getmsh(msh_right_args)
 
     if args.force_override or not isfile(rightmshfname):
         sys.stderr.write("Reversing right lengths\n")
-        temp_pypy_str = "\"from msh_est import reversefile;  reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
-        temp_subprocess_return = subprocess.run("""pypy3 -c %s """%(temp_pypy_str),shell=True)
-        if temp_subprocess_return:
+        temp_pypy_str = "\"from reversefile import reverse_file;  reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
+        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if temp_subprocess_return.returncode != 0:
+            sys.stderr.write("Running without pypy\n")
             reverse_file(rightreversedmshfname,rightmshfname)
+    if args.gzip_check and isfile(rightreversedmshfname):
+        os.remove(rightreversedmshfname)
 
     est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
     sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
