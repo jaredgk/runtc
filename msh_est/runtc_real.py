@@ -14,7 +14,7 @@ from msh_from_vcf import getmsh
 from reversefile import reverse_file
 from aae_work import run_estimator
 
-PYPY_VERSION="pypy3"
+PYPY_VERSION="pypy"
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -99,6 +99,9 @@ def splitArgsForLengths(args,rvcfname):
     if not args.squish:
         msh_left_args.append('--nosquish')
         msh_right_args.append('--nosquish')
+    if args.round != -1:
+        msh_left_args.extend(['--round',str(args.round)])
+        msh_right_args.extend(['--round',str(args.round)])
     return msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname
 
 

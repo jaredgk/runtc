@@ -107,7 +107,8 @@ def gammafunc(*arg):
 
 def roundChi(f,n):
     """
-    Rounds chi to 14 digits after decimal, which fixes some caching errors
+    Rounds chi to n significant digits
+
     """
     if n < 1:
         raise Exception("N value %d is not valid" % (n))
@@ -118,9 +119,9 @@ class fitmodel:
         makes a structure to hold information about a population size model, and optimization parameters
 
         can run one of three population size model types
-            model c - constant population size
-            model e - exponentially growing population
-            model h - two phase history, with constant population size followed by exponential growth until time of sampling
+            model constant - constant population size
+            model expgrowth - exponentially growing population
+            model twophase - two phase history, with constant population size followed by exponential growth until time of sampling
 
         demography parameters:
             n : sample size
@@ -160,7 +161,7 @@ class fitmodel:
                 if te != None:
                     print("te is used without g")
                     exit()
-                self.popmodel = "c"
+                self.popmodel = "constant"
                 self.maxtc = None
                 self.mintc = MINTIME
                 self.zeropoint = None
@@ -169,7 +170,7 @@ class fitmodel:
             else:
                 assert g > 0
                 if te == None:
-                    self.popmodel = "e"
+                    self.popmodel = "expgrowth"
                     self.mintc = MINTIME  ##  4 seems to be necessary when using node2
                     self.maxtc = math.log(N0)/g
                     self.zeropoint = None
@@ -177,7 +178,7 @@ class fitmodel:
                     self.bracket2 = [self.maxtc/2,self.maxtc]
                 else:
                     assert te > 0
-                    self.popmodel = "h"
+                    self.popmodel = "twophase"
                     self.mintc = MINTIME
                     self.maxtc = None
                     self.zeropoint = (math.exp(-(g*te))*(n - 4*g*N0 - n*math.exp(g*te) + g*n*te*math.exp(g*te)))/(g*n)
@@ -186,20 +187,20 @@ class fitmodel:
                     self.bracket = [self.mintc,min(self.zeropoint/2,self.mintc*10)]
                     self.bracket2 = [5*self.zeropoint,10000]
         else:
-            self.popmodel = popmodel
-            if popmodel=="c":
+            self.popmodel = popmodel.lower()
+            if self.popmodel=="constant":
                 self.maxtc = None
                 self.mintc = MINTIME
                 self.zeropoint = None
                 self.bracket = [self.mintc,100]
                 self.bracket2 = [100,1000]
-            if popmodel == "e":
+            if self.popmodel == "expgrowth":
                 self.maxtc = math.log(N0)/g
                 self.mintc = MINTIME ## 4seems to be necessary for node2
                 self.zeropoint = None
                 self.bracket = [self.mintc,self.maxtc/2]
                 self.bracket2 = [self.maxtc/2,self.maxtc]
-            if popmodel == "h":
+            if self.popmodel == "twophase":
                 self.maxtc = None
                 self.mintc = MINTIME
                 try:
@@ -316,14 +317,14 @@ class data:
     def calcprior(self,tc):
         n = self.model.n
         N0 = self.model.N0
-        if self.model.popmodel == "h":
+        if self.model.popmodel == "twophase":
             te = self.model.te
-        if self.model.popmodel == "c":
+        if self.model.popmodel == "constant":
             try:
                 self.logprior = math.log((4*n)/(N0*(2 + (n*tc)/(2.*N0))**3))
             except Exception as ex:
                 self.logprior = 0.0
-        elif self.model.popmodel =="e" or ( self.model.popmodel =="h"  and tc < te ):
+        elif self.model.popmodel =="expgrowth" or ( self.model.popmodel =="twophase"  and tc < te ):
             g = self.model.g
             self.logprior = math.log( (4*n* math.exp(g*tc))/(N0*(2 + (n*(-1 + math.exp(g*tc)))/(2*g*N0))**3) )
         else:
@@ -358,9 +359,9 @@ class data:
         chi = self.chi
         n = self.model.n
         N0 = self.model.N0
-        if self.model.popmodel == "h":
+        if self.model.popmodel == "twophase":
             te = self.model.te
-        if self.model.popmodel=="c":## or model == "f":
+        if self.model.popmodel=="constant":
             if self.singlex:
                 try:
                     temp = (8 * N0 * tc *  math.exp(-2 * tc * chi))/(4 * N0 + n * tc) + (-(n *  math.exp(-2 * tc * chi)) - 2 * n * tc * chi * math.exp(-2 * tc * chi) + n *  (1 + tc * chi) * math.exp(-(tc * chi)))/((4 * N0 + n * tc) * chi**2)
@@ -371,7 +372,7 @@ class data:
                     temp = (16 * N0 * tc**2 *  math.exp(-2 * tc * chi))/(4 * N0 + n * tc) + (-2 * n *  math.exp(-2 * tc * chi) - 4 * n * tc * chi * math.exp(-2 * tc * chi) - 4 * n * tc**2 *  chi**2 * math.exp(-2 * tc * chi) + 2 * n *  math.exp(-(tc * chi)) + 2 * n * tc * chi * math.exp(-(tc * chi)) + n * tc**2 * chi**2 * math.exp(-(tc * chi)))/((4 * N0 + n * tc) * chi**3)
                 except Exception as ex:
                     return largepos
-        elif self.model.popmodel =="e" or ( self.model.popmodel =="h"  and tc < te ):
+        elif self.model.popmodel =="expgrowth" or ( self.model.popmodel =="twophase"  and tc < te ):
             maxtc = self.model.maxtc
             g = self.model.g
             if (tc*(g +  chi)) > 500:
@@ -388,8 +389,8 @@ class data:
                     temp = temp1 + temp2
                 except Exception as ex:
                     return largepos
-        else:  ## model "h" and tc > te
-            assert self.model.popmodel=="h" and tc >= te
+        else:  ## model "twophase" and tc > te
+            assert self.model.popmodel=="twophase" and tc >= te
             g = self.model.g
 ##            if  (te*(g +  chi)) > 500:
 ##                return largepos
@@ -427,7 +428,16 @@ class data:
             args = (dobayes,nosnp)
         else:
             args = (dobayes,)
-        rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=self.model.bracket)
+        if self.model.popmodel=='constant':  ## JH 6/15/2018 tc has approximate solutions, see Singleton_age_estimation.nb
+            if self.singlex:
+                temptc = 0.666082/self.chi
+                bracket =  [temptc/2,temptc,temptc*2]
+            else:
+                temptc = 1.33096/self.chi
+                bracket =  [temptc/2,temptc,temptc*2]
+            rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=bracket)
+        else:
+            rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=self.model.bracket)
         self.tcest = rval.x
         self.loglike = -rval.fun
 
@@ -478,6 +488,10 @@ class datalist(list):
         if len(self) > 1:
             assert ( self[-1].model == None and self[-2].model == None) or self[-1].model.popmodel == self[-2].model.popmodel
 
+    def clear(self):
+        super(datalist, self).clear() ## not sure why this works, but it overrides append
+        assert len(self) == 0
+
     def setmodel(model):
         """
             change the model for all the data elements in self
@@ -489,7 +503,8 @@ class datalist(list):
 
     def tc_likelihood_composite_neg(self,tc, args):
         """
-            calculate the composite likelihood
+            calculate the composite likelihood for a given tc value
+            this gets called by an otpimizer
             if dobayes, calculate the prior just once
         """
         sum = 0.0
@@ -505,23 +520,19 @@ class datalist(list):
         return sum
 
 
-    def estimate_tc(self,dobayes = None,estmethod = None):
+    def estimate_tc_kgt1(self,dobayes = None,estmethod = None):
         """
             estimate_tc for k>1,  arguments are dobayes and estmethod
-
-            unlike estimate_tc for k==1,  there is no 'nosnp' argument
-
             estmethod can be
             'a' : average, mean of k maximum likelihood or bayesian estimates
             'b' : product of exponentials taken before integration over phi (pex method)
             'c' : composite likelihood (default)
         """
         args = (dobayes,)
-        optmethod = self[0].model.optmethod
-        bracket = self[0].model.bracket
-        bracket2 = self[0].model.bracket2
         if estmethod == None or estmethod == 'c':
+            optmethod = self[0].model.optmethod
             bracket = self[0].model.bracket
+            bracket2 = self[0].model.bracket2
             rval1 = opt.minimize_scalar(fun=self.tc_likelihood_composite_neg,args=args,method=optmethod,bracket=bracket)
             rval2 = opt.minimize_scalar(fun=self.tc_likelihood_composite_neg,args=args,method=optmethod,bracket=bracket2)
             if  rval1.fun < rval2.fun or rval2.fun == float("inf") or rval2.fun == float("-inf"):
@@ -545,47 +556,76 @@ class datalist(list):
 
     #Cache options: basic, bin, round, none
     def estimate_tc_cache(self,cache=True,round=-1,bin=False):
-        chi = self[0].chi
-        if round != -1:
-            chi = roundChi(chi,round)
-        fill_cache = False
-        if cache:
-            if self[0].singlex and str(chi) in self.cache_single:
-                self.tcest = self.cache_single[str(chi)]
-                self.cache_hits += 1
-            elif not self[0].singlex and str(chi) in self.cache:
-                self.tcest = self.cache[str(chi)]
-                self.cache_hits += 1
+        """
+            function for tc estimation with a datalist when region-mode and nosnp
+            returns a list of estimates
+
+            if cache
+                if chi in cache
+                    done
+                else
+                    if bin
+                        get bin value
+                    else
+                        calcualte value
+                put value in cache
+            else
+                if bin
+                    get bin value
+                else
+                    calculate value
+
+        """
+        tclist = []
+        for d in self:
+            chi = d.chi
+            if round != -1:
+                chi = roundChi(chi,round)
+            if cache:
+                if d.singlex and str(chi) in self.cache_single:
+                    d.tcest = self.cache_single[str(chi)]
+                    self.cache_hits += 1
+                elif not d.singlex and str(chi) in self.cache:
+                    d.tcest = self.cache[str(chi)]
+                    self.cache_hits += 1
+                else:
+                    if bin:
+                        idx = self.getBinIdx(chi)
+                        d.tcest = self.getIntEst(chi,idx,d.singlex)
+                    else:
+                        d.estimate_tc(dobayes=False)
+                    if d.singlex:
+                        self.cache_single[str(chi)] = d.tcest
+                    else:
+                        self.cache[str(chi)] = d.tcest
+                self.cache_total += 1
             else:
-                fill_cache = True
-            self.cache_total += 1
-        if not cache or fill_cache:
-            if bin:
-                self.estimate_tc_bin()
-            else:
-                self.estimate_tc(dobayes=False)
-        if fill_cache:
-            if self[0].singlex:
-                self.cache_single[str(chi)] = self.tcest
-            else:
-                self.cache[str(chi)] = self.tcest
+                if bin:
+                    idx = self.getBinIdx(chi)
+                    d.tcest = self.getIntEst(chi,idx,d.singlex)
+                else:
+                    d.estimate_tc(dobayes=False)
+            tclist.append(d.tcest)
+        return tclist
 
     def calc_tc_bins(self,start,stop,mu,model,num=10000):
         self.bins = list(np.geomspace(start,stop,num))
         self.bins_single = list(np.geomspace(start,stop,num))
+        #fo = open('bin_vals.txt','w')
         for val in self.bins:
             d = data(mu=mu,model=model,chi=val,side=3)
             d.estimate_tc(dobayes=False)
             self.estimates_bin.append(d.tcest)
+            #fo.write(str(val)+'\t'+str(d.tcest)+'\n')
         for val in self.bins_single:
             d = data(mu=mu,model=model,chi=val,side=2)
             d.estimate_tc(dobayes=False)
             self.estimates_bin_single.append(d.tcest)
 
-    def estimate_tc_bin(self):
-        chi = self[0].chi
-        idx = self.getBinIdx(chi)
-        self.tcest = self.getIntEst(chi,idx,self[0].singlex)
+##    def estimate_tc_bin(self):
+##        chi = self[0].chi
+##        idx = self.getBinIdx(chi)
+##        self.tcest = self.getIntEst(chi,idx,self[0].singlex)
 
 
     def getBinIdx(self,chi):
@@ -612,50 +652,7 @@ class datalist(list):
     def getIntEst(self,chi,idx,singlex):
         s = chi - self.bins[idx]
         s /= (self.bins[idx+1]-self.bins[idx])
+        #sys.stdout.write(str(s)+'\t'+str(self.bins[idx])+'\t'+str(self.bins[idx+1])+'\t'+str(singlex)+str(self.estimates_bin[idx])+'\t'+str(self.estimates_bin[idx+1])+'\n')
         if singlex:
             return s*self.estimates_bin_single[idx]+(1-s)*self.estimates_bin_single[idx+1]
         return s*self.estimates_bin[idx]+(1-s)*self.estimates_bin[idx+1]
-
-
-##some examples  comment out when using as a module
-
-##print ("\nk=1. Constant population model")
-##m = fitmodel(n=7100,N0 = 10000)
-##
-##d = data(dis1 = 10000, dis2=10000, rho1 = 1.2e-8, rho2 = 1e-8, morgans1 = 0.0002, morgans2 = 0.0004,mu = 1e-8,model = m)
-##d.estimate_tc()
-##print ("tc likelihood estimate ", d.tcest)
-##d.estimate_tc(nosnp = True)
-##print ("tc likelihood estimate, no snp ", d.tcest)
-##
-##print ("\nk=1 (same data point).  Exponential growth model")
-##m = fitmodel(n=7100,N0 = 552808,g = 0.03119)
-##d.setmodel(m)
-##d.estimate_tc()
-##print ("tc likelihood estimate ", d.tcest)
-##d.estimate_tc(nosnp = True)
-##print ("tc likelihood estimate, no snp ", d.tcest)
-##
-##
-##print ("\nk=1 (same data point)  Two phase population model")
-##m = fitmodel(n=7100,N0 = 552808,g = 0.03119,te = 129.5,popmodel="h")
-##d.setmodel(m)
-##d.estimate_tc()
-##print ("tc likelihood estimate ", d.tcest)
-##d.estimate_tc(nosnp = True)
-##print ("tc likelihood estimate, no snp ", d.tcest)
-##
-##print ("\nk=3, exponential growth model")
-##m = fitmodel(n=7100,N0 = 552808,g = 0.03119)
-##dl = datalist()
-##d = data(dis1 = 10000000, dis2=100000, rho1 = 1.2e-8, rho2 = 1e-8, morgans1 = 0.02, morgans2 = 0.04,mu = 1e-8,model = m)
-##dl.append(d)
-##d = data(dis1 = 170000, dis2=90000, rho1 = 1e-8, rho2 = 2e-8, morgans1 = 0.003, morgans2 = 0.005,mu = 1e-8,model = m)
-##dl.append(d)
-##d = data(dis1 = 50000, dis2=230000, rho1 = 3e-8, rho2 = 2.2e-8, morgans1 = 0.0035, morgans2 = 0.0052,mu = 1e-8,model = m)
-##dl.append(d)
-##
-##dl.estimate_tc(estmethod = 'a')
-##print ("tc average likelihood estimate ", dl.tcest)
-##dl.estimate_tc(estmethod = 'c')
-##print ("tc composite likelihood estimate ", dl.tcest)

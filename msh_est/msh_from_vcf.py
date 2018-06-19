@@ -1,6 +1,7 @@
 import sys
 import argparse
 import gzip
+import math
 
 
 def createParser():
@@ -11,6 +12,7 @@ def createParser():
     parser.add_argument("--out",dest="outname")
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
+    parser.add_argument("--round",dest="round",type=int,default=-1)
     return parser
 
 def splitAllelesAll(la):
@@ -123,6 +125,18 @@ def msh_gen(a,d,k,gen_list):
     for a_i,a_v in enumerate(a):
         site_msh[a_v] = g_msh[a_i]
     return site_msh
+
+def roundSig(f,n):
+    """
+    Rounds chi to n significant digits
+
+    """
+    if n == -1:
+        return f
+    if n < 1:
+        raise Exception("N value %d is not valid" % (n))
+    sign = (-1 if f < 0 else 1)
+    return sign*round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
 
 def parseGenLine(la,offset):
     a = float(la[0])
@@ -273,13 +287,13 @@ def getmsh(args):
         #outf.write(str(pos_list[-1]))
         writeToFile(outf,str(pos_list[-1]),compress_out)
         if gen_flag:
-            writeToFile(outf,'\t'+str(gen_list[-1]),compress_out)
+            writeToFile(outf,'\t'+str(roundSig(gen_list[-1],args.round)),compress_out)
             #outf.write('\t'+str(gen_list[-1]))
         for i in range(len(msh_vec)):
             writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
             #outf.write('\t'+str(msh_vec[i]))
             if gen_flag:
-                writeToFile(outf,':'+str(g_vec[i]),compress_out)
+                writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
                 #outf.write(':'+str(g_vec[i]))
         writeToFile(outf,'\n',compress_out)
         #outf.write('\n')

@@ -67,8 +67,10 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
     else:
         d1 = intw(l1)
         d2 = intw(l2)
-        m1 = (d1*rec if d1 is not None else None)
-        m2 = (d2*rec if d2 is not None else None)
+        m1 = None
+        m2 = None
+        #m1 = (d1*rec if d1 is not None else None)
+        #m2 = (d2*rec if d2 is not None else None)
     if d1 is None and d2 is None:
         return d
     if d1 is not None:
@@ -78,10 +80,6 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
         if gen_flag:
             gen1 = float(la1[1])
             m1 += abs(prg-gen1)
-        else:
-            gen1 = inc1*rec
-            sub_gen = mu*prp
-            m1 += abs(sub_gen-gen1)
     if d2 is not None and (not region_mode or d1 is None):
         pos2 = int(la2[0])
         inc2 = abs(prp-pos2)
@@ -89,10 +87,6 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
         if gen_flag:
             gen2 = float(la2[1])
             m2 += abs(prg-gen2)
-        else:
-            gen2 = inc2*rec
-            sub_gen = mu*prp
-            m2 += abs(sub_gen-gen2)
     if mod_gen and m1 is not None:
         m1 = genFunction(m1)
     if mod_gen and m2 is not None:
@@ -207,6 +201,8 @@ def run_estimator(args):
     start_idx = args.start
     end_idx = args.end
 
+
+
     mu = args.mut_rate
     rec = args.rec_rate
 
@@ -217,7 +213,6 @@ def run_estimator(args):
     ii = 0
     has_genetic_positions = False
     right_done = False
-
     dl1 = datalist()
 
     l2 = getl(fr)
@@ -240,7 +235,7 @@ def run_estimator(args):
     if args.side_check:
         idx_list = getActiveIdx(la2,start_inds)
 
-    mc = fitmodel(n=n_model,N0=n0_model,popmodel="c",nosnp = args.nosnp)
+    mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.nosnp)
 
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
@@ -304,29 +299,21 @@ def run_estimator(args):
         hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
         hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
         est_str = ''
-        for i in range(start_inds,input_length):
-            d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
-                         prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
-            if d is None:
-                if args.full_out:
-                    est_str += '\t-1,-1,-1,-1,-1,-1'
-                    #outf.write('\t-1,-1,-1,-1,-1,-1')
-                continue
-            if len(dl1) == 0:
+        if args.nosnp:
+            dl1.clear()
+            for i in range(start_inds,input_length):
+                d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
+                             prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
+                #if d is None:
+                #    if args.full_out:
+                #        outf.write('\t-1,-1,-1,-1,-1,-1')
+                #    continue
                 dl1.append(d)
-            else:
-                dl1[0] = d
             if len(dl1) != 0:
-                dl1.estimate_tc_cache(cache=args,round=args.round,bin=args.bin)
-                est_list_ml.append(dl1.tcest)
-                if args.full_out:
-                    est_str += ('\t'+fullStr(dl1))
-                    #outf.write('\t'+fullStr(dl1))
-        est_all_ml = geomean(est_list_ml)
-        est_str += ('\t'+str(est_all_ml)+'\n')
-        #outf.write('\t'+str(est_all_ml))
-        #outf.write('\n')
-        outf.write(est_str)
+                est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
+                est_all_ml = geomean(est_list_ml)
+                est_str += ('\t'+str(est_all_ml)+'\n')
+                outf.write(est_str)
         if position_mode:
             pos_idx += 1
             while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:
