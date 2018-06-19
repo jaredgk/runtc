@@ -304,10 +304,10 @@ def run_estimator(args):
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
                              prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
-                #if d is None:
+                if d is None:
                 #    if args.full_out:
                 #        outf.write('\t-1,-1,-1,-1,-1,-1')
-                #    continue
+                    continue
                 dl1.append(d)
             if len(dl1) != 0:
                 est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
