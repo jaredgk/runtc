@@ -30,7 +30,7 @@ def createParser():
     parser.add_argument("--mod-gen",dest="mod_gen",action="store_true",help="If set, will recalculate genetic distances in estimator using this formula: (1-e^2x)/2")
     parser.add_argument("--full-output",dest="full_out",action="store_true",help="Report lengths, chi, and estimate for all chromosomes in all sites")
     parser.add_argument("--region-mode",dest="region_mode",action="store_true",help="Report estimates for regions between SNPs instead of sites at and ignoring SNPs")
-    parser.add_argument("--force",dest="force_override",action="store_true",help="Will override existing length files if they are present, default is to reuse if they exist")
+    parser.add_argument("--reuse",dest="force_override",action="store_false",help="Will reuse any available length or reversed VCF file having run's tag")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all lines from genetic map even if regions end up with 0 cM/bp rate")
     parser.add_argument("--outmsh",dest="outmsh",type=str,help="Output tag for length files")
     parser.add_argument("--outest",dest="outest",type=str,help="Output name for estimate file")

@@ -2,6 +2,8 @@ import sys
 import argparse
 import gzip
 import math
+import gc
+#from memory_profiler import profile
 
 
 def createParser():
@@ -135,8 +137,7 @@ def roundSig(f,n):
         return f
     if n < 1:
         raise Exception("N value %d is not valid" % (n))
-    sign = (-1 if f < 0 else 1)
-    return sign*round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
+    return round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
 
 def parseGenLine(la,offset):
     a = float(la[0])
@@ -300,7 +301,11 @@ def getmsh(args):
 
         a_prev = a
         d_prev = d
+
+        msh_vec[:] = []
+        g_vec[:] = []
         k += 1
+
     outf.close()
     return outfn
 
