@@ -431,10 +431,10 @@ class data:
         if self.model.popmodel=='constant':  ## JH 6/15/2018 tc has approximate solutions, see Singleton_age_estimation.nb
             if self.singlex:
                 temptc = 0.666082/self.chi
-                bracket =  [temptc/2,temptc,temptc*2]
+                bracket =  [temptc/2,temptc*2]
             else:
                 temptc = 1.33096/self.chi
-                bracket =  [temptc/2,temptc,temptc*2]
+                bracket =  [temptc/2,temptc*2]
             rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=bracket)
         else:
             rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=self.model.bracket)

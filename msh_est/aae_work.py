@@ -304,26 +304,27 @@ def run_estimator(args):
         hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
         hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
         est_str = ''
-        if args.nosnp:
-            dl1.clear()
-            for i in range(start_inds,input_length):
-                d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
+        #if args.nosnp:
+        dl1.clear()
+        for i in range(start_inds,input_length):
+            d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
                              prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
-                if d is None:
+                #if d is None:
                 #    if args.full_out:
                 #        outf.write('\t-1,-1,-1,-1,-1,-1')
-                    continue
+                #    continue
+            if d is not None:
                 dl1.append(d)
-            if len(dl1) != 0:
-                est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
-                if args.singleton:
-                    est_all_ml = max(est_list_ml)
-                else:
-                    est_all_ml = geomean(est_list_ml)
+        if len(dl1) != 0:
+            est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
+            if args.singleton:
+                est_all_ml = max(est_list_ml)
             else:
-                est_all_ml = "NaN"
-            est_str += ('\t'+str(est_all_ml)+'\n')
-            outf.write(est_str)
+                est_all_ml = geomean(est_list_ml)
+        else:
+            est_all_ml = "NaN"
+        est_str += ('\t'+str(est_all_ml)+'\n')
+        outf.write(est_str)
         if position_mode:
             pos_idx += 1
             while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:
@@ -337,8 +338,8 @@ def run_estimator(args):
             prev_right_gen = cur_right_gen
         if right_done:
             break
-    if args.cache:
-        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/float(dl1.cache_total)))
+    if args.cache and args.nosnp:
+        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":
     run(sys.argv[1:])

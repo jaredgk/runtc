@@ -277,6 +277,8 @@ def getmsh(args):
             else:
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
+                if gen_flag:
+                    noninf_gen = float(getGenPos(noninf_pos,l1,l2))
         if k == 0:
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
@@ -292,7 +294,7 @@ def getmsh(args):
         if not args.singleton or noninf_pos is not None:
             msh_vec = msh(a,d,pos_list,noninf_pos)
             if gen_flag:
-                g_vec = msh(a,d,gen_list,noninf_pos)
+                g_vec = msh(a,d,gen_list,noninf_gen)
             if noninf_pos is not None:
                 pos = noninf_pos
             else:
