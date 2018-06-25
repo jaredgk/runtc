@@ -11,7 +11,7 @@ def createParser():
     parser.add_argument("right_file")
     parser.add_argument("--start",dest="start",type=int,default=-1)
     parser.add_argument("--end",dest="end",type=int,default=-1)
-    parser.add_argument("--n",dest="n_model",type=int,default=100)
+    parser.add_argument("--n",dest="n_model",type=int,default=-1)
     parser.add_argument("--n0",dest="n0_model",type=int,default=1000)
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
@@ -25,6 +25,7 @@ def createParser():
     parser.add_argument("--side-check",dest="side_check",action="store_true")
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
+    parser.add_argument("--singleton",dest="singleton",action="store_true")
     return parser
 
 def genFunction(val):
@@ -55,7 +56,7 @@ def getl(f):
     except AttributeError:
         return l
 
-def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,forceleftnone=None,forcerightnone=None):
+def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,forceleftnone=None,forcerightnone=None,singleton_mode=False):
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
@@ -73,20 +74,21 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
         #m2 = (d2*rec if d2 is not None else None)
     if d1 is None and d2 is None:
         return d
-    if d1 is not None:
-        pos1 = int(la1[0])
-        inc1 = abs(prp-pos1)
-        d1 += inc1
-        if gen_flag:
-            gen1 = float(la1[1])
-            m1 += abs(prg-gen1)
-    if d2 is not None and (not region_mode or d1 is None):
-        pos2 = int(la2[0])
-        inc2 = abs(prp-pos2)
-        d2 += inc2
-        if gen_flag:
-            gen2 = float(la2[1])
-            m2 += abs(prg-gen2)
+    if not singleton_mode:
+        if d1 is not None:
+            pos1 = int(la1[0])
+            inc1 = abs(prp-pos1)
+            d1 += inc1
+            if gen_flag:
+                gen1 = float(la1[1])
+                m1 += abs(prg-gen1)
+        if d2 is not None and (not region_mode or d1 is None):
+            pos2 = int(la2[0])
+            inc2 = abs(prp-pos2)
+            d2 += inc2
+            if gen_flag:
+                gen2 = float(la2[1])
+                m2 += abs(prg-gen2)
     if mod_gen and m1 is not None:
         m1 = genFunction(m1)
     if mod_gen and m2 is not None:
@@ -222,7 +224,10 @@ def run_estimator(args):
     start_inds = 1
     if has_genetic_positions:
         start_inds = 2
-    n_model = input_length - start_inds
+    if args.n_model == -1:
+        n_model = input_length - start_inds
+    else:
+        n_model = args.n_model
     prev_right_pos = None
     prev_right_gen = None
     prev_right_pos = int(la2[0])
@@ -303,7 +308,7 @@ def run_estimator(args):
             dl1.clear()
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
-                             prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
+                             prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
                 if d is None:
                 #    if args.full_out:
                 #        outf.write('\t-1,-1,-1,-1,-1,-1')
@@ -311,9 +316,14 @@ def run_estimator(args):
                 dl1.append(d)
             if len(dl1) != 0:
                 est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
-                est_all_ml = geomean(est_list_ml)
-                est_str += ('\t'+str(est_all_ml)+'\n')
-                outf.write(est_str)
+                if args.singleton:
+                    est_all_ml = max(est_list_ml)
+                else:
+                    est_all_ml = geomean(est_list_ml)
+            else:
+                est_all_ml = "NaN"
+            est_str += ('\t'+str(est_all_ml)+'\n')
+            outf.write(est_str)
         if position_mode:
             pos_idx += 1
             while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:

@@ -14,7 +14,7 @@ from msh_from_vcf import getmsh
 from reversefile import reverse_file
 from aae_work import run_estimator
 
-PYPY_VERSION="pypy"
+PYPY_VERSION="pypy3"
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -42,6 +42,7 @@ def createParser():
     parser.add_argument("--side-check",dest="side_check",action="store_true",help="Use only one-sided estimator if any chromosomes at a site are missing a side")
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Will compress msh files and delete intermediate reversed length file")
     parser.add_argument("--positions",dest="posname",type=str,help="List of positions that should output regions for")
+    parser.add_argument("--singleton",dest="singleton",action="store_true",help="Will output lengths only of individuals with a singleton allele at a variant, and report highest estimate of both chromosomes")
     return parser
 
 def splitArgsForEstimator(args):
@@ -72,6 +73,8 @@ def splitArgsForEstimator(args):
         arglist.extend(['--region-mode'])
     if args.posname is not None:
         arglist.extend(['--positions',str(args.posname)])
+    if args.singleton:
+        arglist.append('--singleton')
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -102,6 +105,9 @@ def splitArgsForLengths(args,rvcfname):
     if args.round != -1:
         msh_left_args.extend(['--round',str(args.round)])
         msh_right_args.extend(['--round',str(args.round)])
+    if args.singleton:
+        msh_left_args.append('--singleton')
+        msh_right_args.append('--singleton')
     return msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname
 
 

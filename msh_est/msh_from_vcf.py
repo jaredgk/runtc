@@ -15,6 +15,7 @@ def createParser():
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--round",dest="round",type=int,default=-1)
+    parser.add_argument("--singleton",dest="singleton",action="store_true")
     return parser
 
 def splitAllelesAll(la):
@@ -35,8 +36,8 @@ def splitAllelesAll(la):
         ac += g1
         ac += g2
         an += 2
-    if ac == 1 or ac == an - 1:
-        return []
+    #if ac == 1 or ac == an - 1:
+    #    return []
     return alleles
 
 def writeToFile(outf,write_line,compress_out):
@@ -58,8 +59,8 @@ def splitAllelesSub(la,idx_list):
         alleles.append(geno)
         ac += geno
         an += 1
-    if ac <= 1 or ac >= an - 1:
-        return []
+    #if ac == 1 or ac == an - 1:
+    #    return []
     return alleles
 
 def splitAlleles(la,idx_list=None):
@@ -90,10 +91,14 @@ def getVectors(a_prev,d_prev,cur_row,k):
     d.extend(e)
     return a,d
 
-def msh(a,d,k,pos_list):
+def msh(a,d,pos_list,noninf_pos=None):
     l = len(a)
     y_msh = [0 for i in range(l)]
     site_msh = [0 for i in range(l)]
+    if noninf_pos is not None:
+        pos = noninf_pos
+    else:
+        pos = pos_list[-1]
     for i in range(l):
         if i == l-1:
             c_idx = d[l-1]
@@ -104,29 +109,11 @@ def msh(a,d,k,pos_list):
         if c_idx == 0:
             y_msh[i] = -2
         else:
-            y_msh[i] = abs(pos_list[-1] - pos_list[c_idx-1])
+            y_msh[i] = abs(pos - pos_list[c_idx-1])
     for a_i,a_v in enumerate(a):
         site_msh[a_v] = y_msh[a_i]
     return site_msh
 
-def msh_gen(a,d,k,gen_list):
-    l = len(a)
-    g_msh = [0.0 for i in range(l)]
-    site_msh = [0.0 for i in range(l)]
-    for i in range(l):
-        if i == l-1:
-            c_idx = d[l-1]
-        elif i == 0:
-            c_idx = d[1]
-        else:
-            c_idx = min(d[i],d[i+1])
-        if c_idx == 0:
-            g_msh[i] = -2
-        else:
-            g_msh[i] = abs(gen_list[-1] - gen_list[c_idx-1])
-    for a_i,a_v in enumerate(a):
-        site_msh[a_v] = g_msh[a_i]
-    return site_msh
 
 def roundSig(f,n):
     """
@@ -137,6 +124,8 @@ def roundSig(f,n):
         return f
     if n < 1:
         raise Exception("N value %d is not valid" % (n))
+    if f == 0.0:
+        return 0.0
     return round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
 
 def parseGenLine(la,offset):
@@ -180,6 +169,14 @@ def getGenPos(pos,l1,l2,cm=True):
         i += 1
     gr = (l2[i]-l2[i-1])*rate/float(l1[i]-l1[i-1])
     return rate*l2[i-1]+gr*float(pos-l1[i-1])
+
+def getSingletonIdx(alleles):
+    s = sum(alleles)
+    t = alleles.count(1)
+    if t == 1:
+        return alleles.index(0)
+    else:
+        return alleles.index(1)
 
 
 def readsubfile(subname):
@@ -269,42 +266,51 @@ def getmsh(args):
             pass
         if len(la[3]) != 1 or len(la[4]) != 1:
             continue
+        noninf_pos = None
+        singleton_idx = None
         alleles = splitAlleles(la,idx_list)
         if len(alleles) == 0:
             continue
+        if sum(alleles) == 1 or sum(alleles) == len(alleles)-1:
+            if not args.singleton:
+                continue
+            else:
+                noninf_pos = int(la[1])
+                singleton_idx = getSingletonIdx(alleles)
         if k == 0:
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
             d_prev = [0 for i in range(sample_count)]
-        #sys.stderr.write(str(k)+'\n')
-        pos_list.append(int(la[1]))
-        if gen_flag:
-            gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
-        a,d = getVectors(a_prev,d_prev,alleles,k)
-        msh_vec = msh(a,d,k+1,pos_list)
-        if gen_flag:
-            g_vec = msh(a,d,k+1,gen_list)
-        #tv = [str(ll) for ll in sorted(msh_vec)]
-        #outf.write(str(pos_list[-1]))
-        writeToFile(outf,str(pos_list[-1]),compress_out)
-        if gen_flag:
-            writeToFile(outf,'\t'+str(roundSig(gen_list[-1],args.round)),compress_out)
-            #outf.write('\t'+str(gen_list[-1]))
-        for i in range(len(msh_vec)):
-            writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
-            #outf.write('\t'+str(msh_vec[i]))
+        if not args.singleton or noninf_pos is None:
+            pos_list.append(int(la[1]))
             if gen_flag:
-                writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
-                #outf.write(':'+str(g_vec[i]))
-        writeToFile(outf,'\n',compress_out)
-        #outf.write('\n')
+                gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
+            a,d = getVectors(a_prev,d_prev,alleles,k)
+            a_prev = a
+            d_prev = d
+            k += 1
+        if not args.singleton or noninf_pos is not None:
+            msh_vec = msh(a,d,pos_list,noninf_pos)
+            if gen_flag:
+                g_vec = msh(a,d,gen_list,noninf_pos)
+            if noninf_pos is not None:
+                pos = noninf_pos
+            else:
+                pos = pos_list[-1]
+            writeToFile(outf,str(pos),compress_out)
+            if gen_flag:
+                genpos = float(getGenPos(pos,l1,l2))
+                writeToFile(outf,'\t'+str(roundSig(genpos,args.round)),compress_out)
+            if args.singleton:
+                out_range = [singleton_idx,singleton_idx+1]
+            else:
+                out_range = range(len(msh_vec))
+            for i in out_range:
+                writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
+                if gen_flag:
+                    writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
+            writeToFile(outf,'\n',compress_out)
 
-        a_prev = a
-        d_prev = d
-
-        msh_vec[:] = []
-        g_vec[:] = []
-        k += 1
 
     outf.close()
     return outfn
