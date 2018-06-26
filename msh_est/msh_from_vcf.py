@@ -150,6 +150,7 @@ def getGenMap(f,idx=0,squish=False):
                 a,b = parseGenLine([la[0],la[2]],idx)
             else:
                 a,b = parseGenLine(la,idx)
+
         #if b != 0:
         #For future: Use last position with 0.0 cm instead of first
         if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
@@ -255,7 +256,7 @@ def getmsh(args):
     for line in vcf:
         if compressed_mode:
             line = line.decode()
-        if line[0] == '#':
+        if line[0] == '#' or line[0] == '\n':
             continue
         la = line.strip().split()
         try:

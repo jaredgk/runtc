@@ -16,6 +16,9 @@ from aae_work import run_estimator
 
 PYPY_VERSION="pypy3"
 
+usepypyformsh = False
+usepypyformsh = True
+
 def createParser():
     parser = argparse.ArgumentParser()
     parser.add_argument("vcfname",type=str,help="VCF input file")
@@ -113,6 +116,8 @@ def splitArgsForLengths(args,rvcfname):
 
 def main(argv):
     parser = createParser()
+    if argv[-1] =='':
+        argv = argv[0:-1]
     args = parser.parse_args(argv)
     vcfname = args.vcfname
     vcftag = vcfname[0:vcfname.rfind(".vcf")]
@@ -132,25 +137,27 @@ def main(argv):
     msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
     if args.force_override or not isfile(leftmshfname):
         sys.stderr.write("Creating left lengths: %s\n" %(str(msh_left_args)))
-        temp_args_str = '['
-        for a in msh_left_args:
-            temp_args_str += "\'%s\',"%a
-        temp_args_str = temp_args_str[:-1] + ']'  # replace ',' on end with ']'
-        temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
-        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if temp_subprocess_return.returncode != 0:
+        if usepypyformsh:
+            temp_args_str = '['
+            for a in msh_left_args:
+                temp_args_str += "\'%s\',"%a
+            temp_args_str = temp_args_str[:-1] + ']'  # replace ',' on end with ']'
+            temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
+            temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if usepypyformsh== False or temp_subprocess_return.returncode != 0:
             sys.stderr.write("Running without pypy\n")
             getmsh(msh_left_args)
 
     if args.force_override or (not isfile(rightreversedmshfname) and not isfile(rightmshfname)):
         sys.stderr.write("Creating right lengths: %s\n" % (str(msh_right_args)))
-        temp_args_str = "["
-        for a in msh_right_args:
-            temp_args_str += "\'%s\',"%a
-        temp_args_str = temp_args_str[:-1] + ']' # replace ',' on end with ']'
-        temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
-        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if temp_subprocess_return.returncode != 0:
+        if usepypyformsh:
+            temp_args_str = "["
+            for a in msh_right_args:
+                temp_args_str += "\'%s\',"%a
+            temp_args_str = temp_args_str[:-1] + ']' # replace ',' on end with ']'
+            temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
+            temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
+        if usepypyformsh== False or temp_subprocess_return.returncode != 0:
             sys.stderr.write("Running without pypy\n")
             getmsh(msh_right_args)
 

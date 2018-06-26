@@ -111,9 +111,13 @@ def roundChi(f,n):
     Rounds chi to n significant digits
 
     """
+    if n == -1:
+        return f
     if n < 1:
         raise Exception("N value %d is not valid" % (n))
-    return round(f,-int(math.floor(math.log10(f)))+(n-1))
+    if f == 0.0:
+        return 0.0
+    return round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
 
 class fitmodel:
     """
@@ -421,22 +425,27 @@ class data:
             l += self.logprior
         return -l
 
-    def estimate_tc(self,dobayes = None, nosnp = None):
+    def estimate_tc(self,dobayes = None):
         """
             estimate_tc for k=1
         """
-        if nosnp:
-            args = (dobayes,nosnp)
+        if self.model.nosnp:
+            args = (dobayes,self.model.nosnp)
         else:
             args = (dobayes,)
         if self.model.popmodel=='constant':  ## JH 6/15/2018 tc has approximate solutions, see Singleton_age_estimation.nb
             if self.singlex:
                 temptc = 0.666082/self.chi
-                bracket =  [temptc/2,temptc,temptc*2]
+                if self.model.nosnp:
+                    bracket =  [temptc/2,temptc,temptc*2]
+                else:
+                    bracket = self.model.bracket
             else:
                 temptc = 1.33096/self.chi
-                bracket =  [temptc/2,temptc,temptc*2]
-            print (scipy.__version__)
+                if self.model.nosnp:
+                    bracket =  [temptc/2,temptc,temptc*2]
+                else:
+                    bracket = self.model.bracket
             rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=bracket)
         else:
             rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=self.model.bracket)
@@ -593,7 +602,10 @@ class datalist(list):
                 else:
                     if bin:
                         idx = self.getBinIdx(chi)
-                        d.tcest = self.getIntEst(chi,idx,d.singlex)
+                        if idx < 0:
+                            d.estimate_tc(dobayes=False)
+                        else:
+                            d.tcest = self.getIntEst(chi,idx,d.singlex)
                     else:
                         d.estimate_tc(dobayes=False)
                     if d.singlex:
@@ -604,9 +616,12 @@ class datalist(list):
             else:
                 if bin:
                     idx = self.getBinIdx(chi)
-                    d.tcest = self.getIntEst(chi,idx,d.singlex)
+                    if idx<0:
+                        d.estimate_tc(dobayes=False)
+                    else:
+                        d.tcest = self.getIntEst(chi,idx,d.singlex)
                 else:
-                    d.estimate_tc(dobayes=False)
+                    d.estimate_tc(dobayes=False,nosnp=nosnp)
             tclist.append(d.tcest)
         return tclist
 
@@ -634,9 +649,11 @@ class datalist(list):
         if len(self.bins) == 0:
             raise Exception("Bins have not been initiated")
         if chi < self.bins[0]:
-            raise Exception("Chi value %f is lower than minimum in bins %f" % (chi,self.bins[0]))
+            return -1
+##            raise Exception("Chi value %f is lower than minimum in bins %f" % (chi,self.bins[0]))
         if chi > self.bins[-1]:
-            raise Exception("Chi value %f is higher than maximum in bins %f" % (chi,self.bins[-1]))
+            return -1
+##            raise Exception("Chi value %f is higher than maximum in bins %f" % (chi,self.bins[-1]))
         min_idx = 0
         max_idx = len(self.bins)-2
         while True:

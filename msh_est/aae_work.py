@@ -4,6 +4,7 @@ import numpy as np
 import gzip
 import argparse
 import math
+from msh_from_vcf import getGenMap
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -15,13 +16,13 @@ def createParser():
     parser.add_argument("--n0",dest="n0_model",type=int,default=1000)
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
-    parser.add_argument("--t0",dest="nosnp",action="store_true")
+    parser.add_argument("--t0",dest="nosnp",action="store_true",default = False)
     parser.add_argument("--nocache",dest="cache",action="store_false")
     parser.add_argument("--bin",dest="bin",action="store_true")
     parser.add_argument("--round",dest="round",type=int,default=-1)
     parser.add_argument("--mod-gen",dest="mod_gen",action="store_true")
     parser.add_argument("--full-output",dest="full_out",action="store_true")
-    parser.add_argument("--region-mode",dest="region_mode",action="store_true")
+    parser.add_argument("--region-mode",dest="region_mode",action="store_true",default = False)
     parser.add_argument("--side-check",dest="side_check",action="store_true")
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
@@ -136,21 +137,21 @@ def hasmissing(la,idx_list):
             break
     return anymissing
 
-def getGenMap(f):
-    l1 = []
-    l2 = []
-    for line in f:
-        a,b = parseGenLine(line,0)
-        if b != 0 and (len(l1) < 2 or b != l1[-1]):
-            l1.append(a)
-            l2.append(b)
-    return l1,l2
+##def getGenMap(f):
+##    l1 = []
+##    l2 = []
+##    for line in f:
+##        a,b = parseGenLine(line,0)
+##        if b != 0 and (len(l1) < 2 or b != l1[-1]):
+##            l1.append(a)
+##            l2.append(b)
+##    return l1,l2
 
 def getGenRate(pos,l1,l2):
     if pos < l1[0]:
         return (l2[1]-l2[0])*.01/(l1[1]-l1[0])
     i = 1
-    while i < len(l1)-1 and pos < l1[i]:
+    while i < len(l1)-1 and pos > l1[i]:
         i += 1
     return (l2[i]-l2[i-1])*.01/(l1[i]-l1[i-1])
 
@@ -196,6 +197,7 @@ def run_estimator(args):
         pos_list = [int(l.strip()) for l in posf]
         pos_idx = 0
         position_mode = True
+
 
     region_mode = args.region_mode
 
@@ -292,14 +294,27 @@ def run_estimator(args):
             if right_done:
                 break
             continue
-
-        if region_mode:
-            if position_mode:
-                outf.write(str(pos_list[pos_idx]))
-            else:
-                outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
+        if has_genetic_positions:
+            #recperbp = getGenRate(round((cur_right_pos+prev_right_pos)/2),g1,g2)
+            recperbp = (cur_right_gen-prev_right_gen)/float(cur_right_pos-prev_right_pos)
         else:
-            outf.write(str(prev_right_pos))
+            recperbp = rec
+##        if region_mode:
+##            if position_mode:
+##                outf.write(str(pos_list[pos_idx]))
+##            else:
+##                outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
+##        else:
+##            outf.write(str(prev_right_pos))
+        out_pos = 0
+        #if region_mode:
+        #    if position_mode:
+        #        outf.write(str(pos_list[pos_idx]))
+        #        #out_pos = pos_list[pos_idx]
+        #    else:
+        #        outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
+        #else:
+        #    outf.write(str(prev_right_pos))
 
         hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
         hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
@@ -307,24 +322,34 @@ def run_estimator(args):
         #if args.nosnp:
         dl1.clear()
         for i in range(start_inds,input_length):
+
             d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
-                             prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
-                #if d is None:
-                #    if args.full_out:
-                #        outf.write('\t-1,-1,-1,-1,-1,-1')
-                #    continue
+                         prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
+            #if d is None:
+            #    if args.full_out:
+            #        outf.write('\t-1,-1,-1,-1,-1,-1')
+            #    continue
             if d is not None:
                 dl1.append(d)
+            else:
+                sys.stderr.write("D is none\n")
         if len(dl1) != 0:
+            chi_list = []
+            for d in dl1:
+                chi_list.append(d.chi)
+            chi_geomean = geomean(chi_list)
             est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
             if args.singleton:
                 est_all_ml = max(est_list_ml)
             else:
                 est_all_ml = geomean(est_list_ml)
+            est_str += ("\t%.4g"%recperbp)
+            est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
+            est_str += ('\t'+str(est_all_ml)+'\n')
+            outf.write(str(prev_right_pos)+'\t'+est_str)
         else:
-            est_all_ml = "NaN"
-        est_str += ('\t'+str(est_all_ml)+'\n')
-        outf.write(est_str)
+            sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
+            est_str = ''
         if position_mode:
             pos_idx += 1
             while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:
