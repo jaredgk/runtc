@@ -63,9 +63,7 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
-    if la1 is not None and la2 is not None:
-        if la1[0] != la2[0]:
-            raise Exception("Positions %s and %s dont match"%(la1[0],la2[0]))
+
     if gen_flag:
         d1 = intw(l1.split(':')[0])
         d2 = intw(l2.split(':')[0])

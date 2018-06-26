@@ -268,6 +268,7 @@ def getmsh(args):
         if len(la[3]) != 1 or len(la[4]) != 1:
             continue
         noninf_pos = None
+        noninf_gen = None
         singleton_idx = None
         alleles = splitAlleles(la,idx_list)
         if len(alleles) == 0:
