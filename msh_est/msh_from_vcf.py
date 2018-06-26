@@ -175,9 +175,9 @@ def getSingletonIdx(alleles):
     s = sum(alleles)
     t = alleles.count(1)
     if t == 1:
-        return (alleles.index(0)//2)*2
-    else:
         return (alleles.index(1)//2)*2
+    else:
+        return (alleles.index(0)//2)*2
 
 
 def readsubfile(subname):

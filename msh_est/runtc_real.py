@@ -78,6 +78,10 @@ def splitArgsForEstimator(args):
         arglist.extend(['--positions',str(args.posname)])
     if args.singleton:
         arglist.append('--singleton')
+    if args.mapname is not None:
+        arglist.extend(['--gen',args.mapname])
+    if not args.squish:
+        msh_left_args.append('--nosquish')
     return arglist
 
 def splitArgsForLengths(args,rvcfname):

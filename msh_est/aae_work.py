@@ -27,6 +27,8 @@ def createParser():
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
     parser.add_argument("--singleton",dest="singleton",action="store_true")
+    parser.add_argument("--gen",dest="genname",type=str)
+    parser.add_argument("--nosquish",dest="squish",action="store_false")
     return parser
 
 def genFunction(val):
@@ -61,6 +63,9 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
+    if la1 is not None and la2 is not None:
+        if la1[0] != la2[0]:
+            raise Exception("Positions %s and %s dont match"%(la1[0],la2[0]))
     if gen_flag:
         d1 = intw(l1.split(':')[0])
         d2 = intw(l2.split(':')[0])
@@ -197,6 +202,11 @@ def run_estimator(args):
         pos_list = [int(l.strip()) for l in posf]
         pos_idx = 0
         position_mode = True
+    map_for_rec = False
+    if args.genname is not None:
+        genf = open(args.genname,'r')
+        g1,g2 = getGenMap(genf,squish=args.squish)
+        map_for_rec = True
 
 
     region_mode = args.region_mode
@@ -235,9 +245,9 @@ def run_estimator(args):
     prev_right_pos = int(la2[0])
     if has_genetic_positions:
         prev_right_gen = float(la2[1])
-    if position_mode:
-        while pos_idx < len(pos_list) and pos_list[pos_idx] < prev_right_pos:
-            pos_idx += 1
+
+    #if args.singleton:
+    #    la1 = getl(fl).strip().split()
 
     if args.side_check:
         idx_list = getActiveIdx(la2,start_inds)
@@ -253,7 +263,7 @@ def run_estimator(args):
         outf = sys.stdout
 
     while True:
-        check_left = (region_mode or ii != 0)
+        check_left = (region_mode or args.singleton or ii != 0)
         if check_left:
             try:
                 l1 = getl(fl)
@@ -265,8 +275,9 @@ def run_estimator(args):
             la1 = None
             cur_left_pos = prev_right_pos
         try:
-            l2 = getl(fr)
-            la2 = l2.strip().split()
+            if not args.singleton or ii != 0:
+                l2 = getl(fr)
+                la2 = l2.strip().split()
             cur_right_pos = int(la2[0])
             if has_genetic_positions:
                 cur_right_gen = float(la2[1])
@@ -286,17 +297,13 @@ def run_estimator(args):
 
         est_list_ml = []
 
-        if position_mode and pos_list[pos_idx] > cur_right_pos:
-            ii += 1
-            prev_right_pos = cur_right_pos
-            if has_genetic_positions:
-                prev_right_gen = cur_right_gen
-            if right_done:
-                break
-            continue
-        if has_genetic_positions:
-            #recperbp = getGenRate(round((cur_right_pos+prev_right_pos)/2),g1,g2)
-            recperbp = (cur_right_gen-prev_right_gen)/float(cur_right_pos-prev_right_pos)
+        if map_for_rec:
+            if args.singleton:
+                rec_phys_pos = round((cur_right_pos+prev_right_pos)/2)
+            else:
+                rec_phys_pos = cur_right_pos
+            recperbp = getGenRate(rec_phys_pos,g1,g2)
+            #recperbp = (cur_right_gen-prev_right_gen)/float(cur_right_pos-prev_right_pos)
         else:
             recperbp = rec
 ##        if region_mode:
@@ -307,14 +314,6 @@ def run_estimator(args):
 ##        else:
 ##            outf.write(str(prev_right_pos))
         out_pos = 0
-        #if region_mode:
-        #    if position_mode:
-        #        outf.write(str(pos_list[pos_idx]))
-        #        #out_pos = pos_list[pos_idx]
-        #    else:
-        #        outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
-        #else:
-        #    outf.write(str(prev_right_pos))
 
         hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
         hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
@@ -323,16 +322,10 @@ def run_estimator(args):
         dl1.clear()
         for i in range(start_inds,input_length):
 
-            d = makeData(la1,la2,i,has_genetic_positions,rec,mu,mc,
+            d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
                          prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
-            #if d is None:
-            #    if args.full_out:
-            #        outf.write('\t-1,-1,-1,-1,-1,-1')
-            #    continue
             if d is not None:
                 dl1.append(d)
-            else:
-                sys.stderr.write("D is none\n")
         if len(dl1) != 0:
             chi_list = []
             for d in dl1:
@@ -346,17 +339,14 @@ def run_estimator(args):
             est_str += ("\t%.4g"%recperbp)
             est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
             est_str += ('\t'+str(est_all_ml)+'\n')
-            outf.write(str(prev_right_pos)+'\t'+est_str)
+            if args.singleton:
+                outf.write(str(cur_right_pos)+'\t'+est_str)
+            else:
+                outf.write(str(prev_right_pos)+'\t'+est_str)
         else:
             sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
             est_str = ''
-        if position_mode:
-            pos_idx += 1
-            while pos_idx < len(pos_list) and pos_list[pos_idx] < cur_right_pos:
-                outf.write(str(pos_list[pos_idx])+est_str)
-                pos_idx += 1
-            if pos_idx == len(pos_list):
-                break
+
         ii += 1
         prev_right_pos = cur_right_pos
         if has_genetic_positions:
