@@ -238,9 +238,11 @@ def getmsh(args):
     a_mat = []
     d_mat = []
     m_mat = []
+
     k = 0
     pos_list = []
     gen_list = None
+    a = None
     if gen_flag:
         gen_list = []
     if args.outname is not None:
@@ -294,9 +296,18 @@ def getmsh(args):
             d_prev = d
             k += 1
         if not args.singleton or noninf_pos is not None:
-            msh_vec = msh(a,d,pos_list,noninf_pos)
-            if gen_flag:
-                g_vec = msh(a,d,gen_list,noninf_gen)
+            if args.singleton:
+                out_range = [singleton_idx,singleton_idx+1]
+            else:
+                out_range = range(sample_count)
+            if a is None:
+                msh_vec = [-2 for ii in len(out_range)]
+                if gen_flag:
+                    g_msh = [-2.0 for ii in len(out_range)]
+            else:
+                msh_vec = msh(a,d,pos_list,noninf_pos)
+                if gen_flag:
+                    g_vec = msh(a,d,gen_list,noninf_gen)
             if noninf_pos is not None:
                 pos = noninf_pos
             else:
@@ -305,10 +316,6 @@ def getmsh(args):
             if gen_flag:
                 genpos = float(getGenPos(pos,l1,l2))
                 writeToFile(outf,'\t'+str(roundSig(genpos,args.round)),compress_out)
-            if args.singleton:
-                out_range = [singleton_idx,singleton_idx+1]
-            else:
-                out_range = range(len(msh_vec))
             for i in out_range:
                 writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
                 if gen_flag:
