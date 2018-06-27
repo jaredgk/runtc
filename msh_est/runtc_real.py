@@ -6,6 +6,7 @@ import sys
 import argparse
 from os.path import isfile
 import subprocess
+import gzip
 #try:
 #    from msh_est import reverse_file,getmsh,run_estimator
 #except:
@@ -25,14 +26,12 @@ def createParser():
     parser.add_argument("--map",dest="mapname",type=str,help="Genetic map to be used for calculating genetic distances")
     parser.add_argument("--start",dest="start",type=int,default=-1,help="If set, start reporting estimates for SNP at this line")
     parser.add_argument("--end",dest="end",type=int,default=-1,help="If set, end reporting estimates for SNP at this line")
-    parser.add_argument("--n",dest="n_model",type=int,default=100)
     parser.add_argument("--n0",dest="n0_model",type=int,default=1000,help="Population size of sampled population")
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8,help="Mutation rate for estimator")
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8,help="Recombination rate for estimator")
-    parser.add_argument("--t0",dest="nosnp",action="store_true",help="If set, will run invariant site estimator")
+    parser.add_argument("--alpha",dest="alpha",action="store_true",help="If set, will run invariant site estimator. If not, will run singleton mode estimator")
     parser.add_argument("--mod-gen",dest="mod_gen",action="store_true",help="If set, will recalculate genetic distances in estimator using this formula: (1-e^2x)/2")
-    parser.add_argument("--full-output",dest="full_out",action="store_true",help="Report lengths, chi, and estimate for all chromosomes in all sites")
-    parser.add_argument("--region-mode",dest="region_mode",action="store_true",help="Report estimates for regions between SNPs instead of sites at and ignoring SNPs")
+    parser.add_argument("--snp-mode",dest="snp_mode",action="store_true",help="Report lengths from adjacent variants (instead of region)")
     parser.add_argument("--reuse",dest="force_override",action="store_false",help="Will reuse any available length or reversed VCF file having run's tag")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all lines from genetic map even if regions end up with 0 cM/bp rate")
     parser.add_argument("--outmsh",dest="outmsh",type=str,help="Output tag for length files")
@@ -45,21 +44,18 @@ def createParser():
     parser.add_argument("--side-check",dest="side_check",action="store_true",help="Use only one-sided estimator if any chromosomes at a site are missing a side")
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Will compress msh files and delete intermediate reversed length file")
     parser.add_argument("--positions",dest="posname",type=str,help="List of positions that should output regions for")
-    parser.add_argument("--singleton",dest="singleton",action="store_true",help="Will output lengths only of individuals with a singleton allele at a variant, and report highest estimate of both chromosomes")
     return parser
 
 def splitArgsForEstimator(args):
     arglist = []
     arglist.extend(['--start',str(args.start)])
     arglist.extend(['--end',str(args.end)])
-    arglist.extend(['--n',str(args.n_model)])
+    arglist.extend(['--n',str(getN(args))])
     arglist.extend(['--n0',str(args.n0_model)])
     arglist.extend(['--mut',str(args.mut_rate)])
     arglist.extend(['--rec',str(args.rec_rate)])
-    if args.nosnp:
-        arglist.extend(['--t0'])
-    if args.full_out:
-        arglist.extend(['--full-output'])
+    if args.alpha:
+        arglist.extend(['--alpha'])
     if args.mod_gen:
         arglist.extend(['--mod-gen'])
     if not args.cache:
@@ -72,12 +68,10 @@ def splitArgsForEstimator(args):
         arglist.extend(['--outfn',str(args.outest)])
     if args.side_check:
         arglist.extend(['--side-check'])
-    if args.region_mode:
-        arglist.extend(['--region-mode'])
+    if args.snp_mode:
+        arglist.extend(['--snp-mode'])
     if args.posname is not None:
         arglist.extend(['--positions',str(args.posname)])
-    if args.singleton:
-        arglist.append('--singleton')
     if args.mapname is not None:
         arglist.extend(['--gen',args.mapname])
     if not args.squish:
@@ -112,10 +106,26 @@ def splitArgsForLengths(args,rvcfname):
     if args.round != -1:
         msh_left_args.extend(['--round',str(args.round)])
         msh_right_args.extend(['--round',str(args.round)])
-    if args.singleton:
+    if not args.alpha:
         msh_left_args.append('--singleton')
         msh_right_args.append('--singleton')
     return msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname
+
+def getN(args):
+    if args.subname is not None:
+        sf = open(args.subname,'r')
+        sl = sf.readlines()
+        return len(sl)
+    else:
+        if args.vcfname[-3:] == '.gz':
+            tf = gzip.open(args.vcfname,'rt')
+        else:
+            tf = open(args.vcfname,'r')
+        l = '#'
+        while l[0] == '#':
+            l = tf.readline()
+        la = l.strip().split()
+        return 2*(len(la)-9)
 
 
 def main(argv):

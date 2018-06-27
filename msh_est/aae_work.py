@@ -16,17 +16,16 @@ def createParser():
     parser.add_argument("--n0",dest="n0_model",type=int,default=1000)
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
-    parser.add_argument("--t0",dest="nosnp",action="store_true",default = False)
+    parser.add_argument("--alpha",dest="alpha",action="store_true",default = False)
     parser.add_argument("--nocache",dest="cache",action="store_false")
     parser.add_argument("--bin",dest="bin",action="store_true")
     parser.add_argument("--round",dest="round",type=int,default=-1)
     parser.add_argument("--mod-gen",dest="mod_gen",action="store_true")
     parser.add_argument("--full-output",dest="full_out",action="store_true")
-    parser.add_argument("--region-mode",dest="region_mode",action="store_true",default = False)
+    parser.add_argument("--snp-mode",dest="snp_mode",action="store_true",default = False)
     parser.add_argument("--side-check",dest="side_check",action="store_true")
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
-    parser.add_argument("--singleton",dest="singleton",action="store_true")
     parser.add_argument("--gen",dest="genname",type=str)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     return parser
@@ -59,7 +58,7 @@ def getl(f):
     except AttributeError:
         return l
 
-def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,forceleftnone=None,forcerightnone=None,singleton_mode=False):
+def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,snp_mode,mod_gen=False,forceleftnone=None,forcerightnone=None,alpha=True):
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
@@ -78,7 +77,7 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
         #m2 = (d2*rec if d2 is not None else None)
     if d1 is None and d2 is None:
         return d
-    if not singleton_mode:
+    if alpha:
         if d1 is not None:
             pos1 = int(la1[0])
             inc1 = abs(prp-pos1)
@@ -86,7 +85,7 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,region_mode,mod_gen=False,f
             if gen_flag:
                 gen1 = float(la1[1])
                 m1 += abs(prg-gen1)
-        if d2 is not None and (not region_mode or d1 is None):
+        if d2 is not None and (snp_mode or d1 is None):
             pos2 = int(la2[0])
             inc2 = abs(prp-pos2)
             d2 += inc2
@@ -207,7 +206,7 @@ def run_estimator(args):
         map_for_rec = True
 
 
-    region_mode = args.region_mode
+    snp_mode = args.snp_mode
 
 
     start_idx = args.start
@@ -250,7 +249,7 @@ def run_estimator(args):
     if args.side_check:
         idx_list = getActiveIdx(la2,start_inds)
 
-    mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.nosnp)
+    mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
 
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
@@ -261,7 +260,7 @@ def run_estimator(args):
         outf = sys.stdout
 
     while True:
-        check_left = (region_mode or args.singleton or ii != 0)
+        check_left = (not snp_mode or not args.alpha or ii != 0)
         if check_left:
             try:
                 l1 = getl(fl)
@@ -273,14 +272,14 @@ def run_estimator(args):
             la1 = None
             cur_left_pos = prev_right_pos
         try:
-            if not args.singleton or ii != 0:
+            if args.alpha or ii != 0:
                 l2 = getl(fr)
                 la2 = l2.strip().split()
             cur_right_pos = int(la2[0])
             if has_genetic_positions:
                 cur_right_gen = float(la2[1])
         except IndexError as si:
-            if region_mode:
+            if not snp_mode:
                 break
             cur_right_pos = int(la1[0])
             if has_genetic_positions:
@@ -296,7 +295,7 @@ def run_estimator(args):
         est_list_ml = []
 
         if map_for_rec:
-            if args.singleton:
+            if not args.alpha:
                 rec_phys_pos = round((cur_right_pos+prev_right_pos)/2)
             else:
                 rec_phys_pos = cur_right_pos
@@ -321,7 +320,7 @@ def run_estimator(args):
         for i in range(start_inds,input_length):
 
             d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
-                         prev_right_pos,prev_right_gen,region_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,singleton_mode=args.singleton)
+                         prev_right_pos,prev_right_gen,snp_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,alpha=args.alpha)
             if d is not None:
                 dl1.append(d)
         if len(dl1) != 0:
@@ -330,17 +329,17 @@ def run_estimator(args):
                 chi_list.append(d.chi)
             chi_geomean = geomean(chi_list)
             est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
-            if args.singleton:
-                est_all_ml = max(est_list_ml)
-            else:
+            if args.alpha:
                 est_all_ml = geomean(est_list_ml)
+            else:
+                est_all_ml = max(est_list_ml)
             est_str += ("\t%.4g"%recperbp)
             est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
             est_str += ('\t'+str(est_all_ml)+'\n')
-            if args.singleton:
-                outf.write(str(cur_right_pos)+'\t'+est_str)
-            else:
+            if args.alpha:
                 outf.write(str(prev_right_pos)+'\t'+est_str)
+            else:
+                outf.write(str(cur_right_pos)+'\t'+est_str)
         else:
             sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
             est_str = ''
@@ -351,7 +350,7 @@ def run_estimator(args):
             prev_right_gen = cur_right_gen
         if right_done:
             break
-    if args.cache and args.nosnp:
+    if args.cache and args.alpha:
         sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":
