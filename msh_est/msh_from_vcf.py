@@ -301,9 +301,9 @@ def getmsh(args):
             else:
                 out_range = range(sample_count)
             if a is None:
-                msh_vec = [-2 for ii in len(out_range)]
+                msh_vec = [-2 for ii in out_range]
                 if gen_flag:
-                    g_vec = [-2.0 for ii in len(out_range)]
+                    g_vec = [-2.0 for ii in out_range]
             else:
                 msh_vec = msh(a,d,pos_list,noninf_pos)
                 if gen_flag:
