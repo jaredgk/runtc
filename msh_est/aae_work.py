@@ -279,7 +279,7 @@ def run_estimator(args):
             if has_genetic_positions:
                 cur_right_gen = float(la2[1])
         except IndexError as si:
-            if not snp_mode:
+            if args.alpha and not snp_mode:
                 break
             cur_right_pos = int(la1[0])
             if has_genetic_positions:
