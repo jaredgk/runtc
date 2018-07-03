@@ -416,7 +416,10 @@ class data:
             if self.model.nosnp:
                 mterm = 0.0
             else:
-                mterm = math.log ( 1 - math.exp(-(tc*mu)))
+                if mu > 0.0: # can be true if using snp array data to get tc
+                    mterm = math.log ( 1 - math.exp(-(tc*mu)))
+                else:
+                    mterm = 0.0
             l = math.log(temp) + mterm
         else:
             return largepos
@@ -443,10 +446,14 @@ class data:
             else:
                 temptc = 1.33096/self.chi
                 if self.model.nosnp:
-                    bracket =  [temptc/2,temptc,temptc*2]
+                    bracket =  [temptc/2,temptc,temptc*20]
                 else:
                     bracket = self.model.bracket
-            rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=bracket)
+            try:
+                rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=bracket)
+            except:
+                rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=[1e-3,1e5])
+
         else:
             rval = opt.minimize_scalar(fun=self.tc_likelihood_neg,args=args,method=self.model.optmethod,bracket=self.model.bracket)
         self.tcest = rval.x
@@ -658,7 +665,7 @@ class datalist(list):
         max_idx = len(self.bins)-2
         while True:
             if max_idx < min_idx:
-                raise Exception("Error finding region for chi")
+                raise Exception("Error finding region for chi %.4g"%chi)
             m = (min_idx+max_idx)//2
             if self.bins[m] <= chi < self.bins[m+1]:
                 return m

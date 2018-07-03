@@ -36,7 +36,7 @@ def createParser():
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all lines from genetic map even if regions end up with 0 cM/bp rate")
     parser.add_argument("--outmsh",dest="outmsh",type=str,help="Output tag for length files")
     parser.add_argument("--outest",dest="outest",type=str,help="Output name for estimate file")
-    parser.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
+    #parser.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
     parser.add_argument("--rev",dest="revname",type=str,help="Path to reversed VCF (by default this file will never be overwritten by --force)")
     parser.add_argument("--nocache",dest="cache",action="store_false",help="Turn off caching of estimates in estimator")
     parser.add_argument("--bin",dest="bin",action="store_true",help="Calculate estimates by linear interpolation of geometrically-distributed pre-calculated estimates")
@@ -44,16 +44,25 @@ def createParser():
     parser.add_argument("--side-check",dest="side_check",action="store_true",help="Use only one-sided estimator if any chromosomes at a site are missing a side")
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Will compress msh files and delete intermediate reversed length file")
     parser.add_argument("--positions",dest="posname",type=str,help="List of positions that should output regions for")
+    #parser.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
+    parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
+    subgroup = parser.add_mutually_exclusive_group()
+    subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
+    subgroup.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
+
     return parser
 
 def splitArgsForEstimator(args):
     arglist = []
     arglist.extend(['--start',str(args.start)])
     arglist.extend(['--end',str(args.end)])
-    arglist.extend(['--n',str(getN(args))])
+    if args.random_n != -1:
+        arglist.extend(['--n',str(args.random_n)])
+    else:
+        arglist.extend(['--n',str(getN(args))])
     arglist.extend(['--n0',str(args.n0_model)])
     arglist.extend(['--mut',str(args.mut_rate)])
-    arglist.extend(['--rec',str(args.rec_rate)])
+
     if args.alpha:
         arglist.extend(['--alpha'])
     if args.mod_gen:
@@ -74,6 +83,8 @@ def splitArgsForEstimator(args):
         arglist.extend(['--positions',str(args.posname)])
     if args.mapname is not None:
         arglist.extend(['--gen',args.mapname])
+    else:
+        arglist.extend(['--rec',str(args.rec_rate)])
     if not args.squish:
         msh_left_args.append('--nosquish')
     return arglist
@@ -109,10 +120,23 @@ def splitArgsForLengths(args,rvcfname):
     if not args.alpha:
         msh_left_args.append('--singleton')
         msh_right_args.append('--singleton')
+    if args.random_n != -1:
+        totaln = getN(args,skipsub = True)
+        if args.random_n > totaln:
+            raise Exception("Random subsample of %d is larger than sample size %d"%(args.random_n,totaln))
+        #msh_left_args.extend(['--n0',str(totaln)])
+        #msh_right_args.extend(['--n0',str(totaln)])
+        import random
+        if args.random_n_seed == -1:
+            seed = random.randint(1,1000000)
+        else:
+            seed = args.random_n_seed
+        msh_left_args.extend(['--randn-seed',str(seed),str(args.random_n)])
+        msh_right_args.extend(['--randn-seed',str(seed),str(args.random_n)])
     return msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname
 
-def getN(args):
-    if args.subname is not None:
+def getN(args, skipsub = False):
+    if args.subname is not None and skipsub != True:
         sf = open(args.subname,'r')
         sl = sf.readlines()
         return len(sl)
@@ -125,7 +149,12 @@ def getN(args):
         while l[0] == '#':
             l = tf.readline()
         la = l.strip().split()
-        return 2*(len(la)-9)
+        n = 0
+        for i in range(9,len(la)):
+            laa = la[i].split(':')[0]
+            sc = len(laa.replace('|','/').split('/'))
+            n += sc
+        return n
 
 
 def main(argv):

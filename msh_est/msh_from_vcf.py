@@ -16,6 +16,10 @@ def createParser():
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--round",dest="round",type=int,default=-1)
     parser.add_argument("--singleton",dest="singleton",action="store_true")
+    parser.add_argument("--randn-seed",dest="randn_and_seed",type=int,nargs=2)
+
+##    parser.add_argument('-l', '--list', help='delimited list input', type=str)
+    #parser.add_argument("--n0",dest="n_model",type=int,default=-1)
     return parser
 
 def splitAllelesAll(la):
@@ -23,21 +27,17 @@ def splitAllelesAll(la):
     ac = 0
     an = 0
     for i in range(9,len(la)):
-        try:
-            g1 = int(la[i][0])
+        laa = la[i].split(':')[0]
+        gts = laa.replace('|','/').split('/')
+        #sc = len(laa.replace('|','/').split('/'))
+        for j in range(len(gts)):
             try:
-                g2 = int(la[i][2])
-            except Exception:
-                print (la)
-        except ValueError:
-            return []
-        alleles.append(g1)
-        alleles.append(g2)
-        ac += g1
-        ac += g2
-        an += 2
-    #if ac == 1 or ac == an - 1:
-    #    return []
+                g1 = int(laa[j])
+            except ValueError:
+                return []
+            alleles.append(g1)
+            ac += g1
+            an += 1
     return alleles
 
 def writeToFile(outf,write_line,compress_out):
@@ -45,20 +45,51 @@ def writeToFile(outf,write_line,compress_out):
         write_line = write_line.encode()
     outf.write(write_line)
 
+def subsampToIdx(la,sub_list):
+    sub_list.sort()
+    current_idx = 0
+    sub_idx = 0
+    idx_list = []
+    for i in range(9,len(la)):
+        laa = la[i].split(':')[0]
+        gts = laa.replace('|','/').split('/')
+        for j in range(len(gts)):
+            if current_idx == sub_list[sub_idx]:
+                idx_list.append([i,j])
+                sub_idx += 1
+            current_idx += 1
+            if sub_idx == len(sub_list):
+                break
+        if sub_idx == len(sub_list):
+            break
+    if sub_idx != len(sub_list):
+        raise Exception("Value %d in subsample list is too large for data" %(sub_list[sub_idx]))
+    return idx_list
+
 def splitAllelesSub(la,idx_list):
     alleles = []
     ac = 0
     an = 0
+    #for i in range(len(idx_list)):
+    #    reg = (idx_list[i]%2)*2
+    #    f_idx = (idx_list[i]//2)+9
+    #    try:
+    #        geno = int(la[f_idx][reg])
+    #    except ValueError:
+    #        return []
+    #    alleles.append(geno)
+    #    ac += geno
+    #    an += 1
     for i in range(len(idx_list)):
-        reg = (idx_list[i]%2)*2
-        f_idx = (idx_list[i]//2)+9
+        ip = idx_list[i]
+        laa = la[ip[0]].split(':')[0]
+        gts = laa.replace('|','/').split('/')
         try:
-            geno = int(la[f_idx][reg])
+            geno = int(gts[ip[1]])
         except ValueError:
             return []
         alleles.append(geno)
-        ac += geno
-        an += 1
+
     #if ac == 1 or ac == an - 1:
     #    return []
     return alleles
@@ -68,6 +99,14 @@ def splitAlleles(la,idx_list=None):
         return splitAllelesAll(la)
     else:
         return splitAllelesSub(la,idx_list)
+
+def getN(la):
+    n = 0
+    for i in range(9,len(la)):
+        laa = la[i].split(':')[0]
+        sc = len(laa.replace('|','/').split('/'))
+        n += sc
+    return n
 
 def getVectors(a_prev,d_prev,cur_row,k):
     p = k+1
@@ -211,6 +250,14 @@ def readsubfile(subname):
     sf.close()
     return idx_list
 
+def getrandomsub(la,seed,pickn):
+    import random
+    random.seed(seed)
+    sub_list =   random.sample(range(getN(la)),pickn)
+    sub_list.sort()
+    idx_list = subsampToIdx(la,sub_list)
+    return idx_list
+
 
 def getmsh(args):
     parser = createParser()
@@ -218,16 +265,25 @@ def getmsh(args):
 
     gen_flag = False
     sub_flag = False
+    rand_flag = False
     if args.genname is not None:
         gf = open(args.genname,'r')
         l1,l2 = getGenMap(gf,idx=args.genidx,squish=args.squish)
         gen_flag = True
 
     idx_list = None
+    if args.randn_and_seed is not None:
+        #randn = int(args.randn_and_seed.split()[1])
+        #seed = int(args.randn_and_seed.split()[0])
+        randn = args.randn_and_seed[1]
+        seed = args.randn_and_seed[0]
+        #idx_list = getrandomsub(seed,randn,args.n_model)
+        sub_flag = True
+        rand_flag = True
     if args.subname is not None:
         #sf = open(args.subname,'r')
         #idx_list = [int(i.strip()) for i in sf]
-        idx_list = readsubfile(args.subname)
+        sub_list = readsubfile(args.subname)
         sub_flag = True
     compressed_mode = False
     if args.vcfname[-3:] == '.gz':
@@ -272,6 +328,11 @@ def getmsh(args):
         noninf_pos = None
         noninf_gen = None
         singleton_idx = None
+        if k == 0 and sub_flag:
+            if rand_flag:
+                idx_list = getrandomsub(la,seed,randn)
+            else:
+                idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
         if len(alleles) == 0:
             continue

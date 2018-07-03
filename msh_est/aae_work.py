@@ -201,6 +201,7 @@ def run_estimator(args):
         position_mode = True
     map_for_rec = False
     if args.genname is not None:
+        print(args.genname)
         genf = open(args.genname,'r')
         g1,g2 = getGenMap(genf,squish=args.squish)
         map_for_rec = True
