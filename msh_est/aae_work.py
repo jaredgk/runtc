@@ -28,6 +28,7 @@ def createParser():
     parser.add_argument("--positions",dest="posname",type=str)
     parser.add_argument("--gen",dest="genname",type=str)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
+    parser.add_argument("--pos",dest="pos",action="store_true")
     return parser
 
 def genFunction(val):
@@ -58,7 +59,7 @@ def getl(f):
     except AttributeError:
         return l
 
-def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,snp_mode,mod_gen=False,forceleftnone=None,forcerightnone=None,alpha=True):
+def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False,forceleftnone=None,forcerightnone=None):
     d = None
     l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
     l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
@@ -77,7 +78,7 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,snp_mode,mod_gen=False,forc
         #m2 = (d2*rec if d2 is not None else None)
     if d1 is None and d2 is None:
         return d
-    if alpha:
+    if length_offset > 0:
         if d1 is not None:
             pos1 = int(la1[0])
             inc1 = abs(prp-pos1)
@@ -85,7 +86,7 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,snp_mode,mod_gen=False,forc
             if gen_flag:
                 gen1 = float(la1[1])
                 m1 += abs(prg-gen1)
-        if d2 is not None and (snp_mode or d1 is None):
+        if d2 is not None and (length_offset == 2 or d1 is None):
             pos2 = int(la2[0])
             inc2 = abs(prp-pos2)
             d2 += inc2
@@ -220,8 +221,15 @@ def run_estimator(args):
 
     #n_model = args.n_model
     n0_model = args.n0_model
-
-
+    #Means left and right lengths should line up
+    lengths_set = (not args.alpha or args.pos)
+    length_offset = 0
+    if args.alpha and not args.pos:
+        if args.snp_mode:
+            length_offset = 2
+        else:
+            length_offset = 1
+    sys.stderr.write(str(length_offset)+'\n')
     ii = 0
     has_genetic_positions = False
     right_done = False
@@ -261,7 +269,8 @@ def run_estimator(args):
         outf = sys.stdout
 
     while True:
-        check_left = (not snp_mode or not args.alpha or ii != 0)
+        #check_left = (not snp_mode or lengths_set or ii != 0)
+        check_left = (length_offset <= 1 or ii != 0)
         if check_left:
             try:
                 l1 = getl(fl)
@@ -273,14 +282,16 @@ def run_estimator(args):
             la1 = None
             cur_left_pos = prev_right_pos
         try:
-            if args.alpha or ii != 0:
+            #if args.alpha or ii != 0:
+            #if not lengths_set or ii != 0:
+            if length_offset >= 1 or ii != 0:
                 l2 = getl(fr)
                 la2 = l2.strip().split()
             cur_right_pos = int(la2[0])
             if has_genetic_positions:
                 cur_right_gen = float(la2[1])
         except IndexError as si:
-            if args.alpha and not snp_mode:
+            if length_offset < 2:
                 break
             cur_right_pos = int(la1[0])
             if has_genetic_positions:
@@ -296,7 +307,7 @@ def run_estimator(args):
         est_list_ml = []
 
         if map_for_rec:
-            if not args.alpha:
+            if length_offset > 0:
                 rec_phys_pos = round((cur_right_pos+prev_right_pos)/2)
             else:
                 rec_phys_pos = cur_right_pos
@@ -319,9 +330,8 @@ def run_estimator(args):
         #if args.nosnp:
         dl1.clear()
         for i in range(start_inds,input_length):
-
             d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
-                         prev_right_pos,prev_right_gen,snp_mode,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing,alpha=args.alpha)
+                         prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
             if d is not None:
                 dl1.append(d)
         if len(dl1) != 0:
@@ -337,7 +347,7 @@ def run_estimator(args):
             est_str += ("\t%.4g"%recperbp)
             est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
             est_str += ('\t'+str(est_all_ml)+'\n')
-            if args.alpha:
+            if length_offset > 0:
                 outf.write(str(prev_right_pos)+'\t'+est_str)
             else:
                 outf.write(str(cur_right_pos)+'\t'+est_str)
@@ -355,4 +365,4 @@ def run_estimator(args):
         sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":
-    run(sys.argv[1:])
+    run_estimator(sys.argv[1:])

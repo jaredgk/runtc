@@ -438,13 +438,19 @@ class data:
             args = (dobayes,)
         if self.model.popmodel=='constant':  ## JH 6/15/2018 tc has approximate solutions, see Singleton_age_estimation.nb
             if self.singlex:
-                temptc = 0.666082/self.chi
+                try:
+                    temptc = 0.666082/self.chi
+                except ZeroDivisionError:
+                    temptc = 1e10
                 if self.model.nosnp:
                     bracket =  [temptc/2,temptc,temptc*2]
                 else:
                     bracket = self.model.bracket
             else:
-                temptc = 1.33096/self.chi
+                try:
+                    temptc = 1.33096/self.chi
+                except ZeroDivisionError:
+                    temptc = 1e10
                 if self.model.nosnp:
                     bracket =  [temptc/2,temptc,temptc*20]
                 else:

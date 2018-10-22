@@ -18,7 +18,7 @@ from aae_work import run_estimator
 PYPY_VERSION="pypy3"
 
 usepypyformsh = False
-usepypyformsh = True
+#usepypyformsh = True
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -46,6 +46,9 @@ def createParser():
     parser.add_argument("--positions",dest="posname",type=str,help="List of positions that should output regions for")
     #parser.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
+    parser.add_argument("--include-singletons",dest="inc_sing",action="store_true")
+    parser.add_argument("--lengths-only",dest="lengths_only",action="store_true",help="If set, will stop after generating lengths")
+    parser.add_argument("--pypy",dest="use_pypy",action="store_true",help="If set, use pypy to accelerate length generation")
     subgroup = parser.add_mutually_exclusive_group()
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     subgroup.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
@@ -79,14 +82,14 @@ def splitArgsForEstimator(args):
         arglist.extend(['--side-check'])
     if args.snp_mode:
         arglist.extend(['--snp-mode'])
-    if args.posname is not None:
-        arglist.extend(['--positions',str(args.posname)])
     if args.mapname is not None:
         arglist.extend(['--gen',args.mapname])
     else:
         arglist.extend(['--rec',str(args.rec_rate)])
     if not args.squish:
-        msh_left_args.append('--nosquish')
+        arglist.append('--nosquish')
+    if args.posname is not None:
+        arglist.append('--pos')
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -120,6 +123,13 @@ def splitArgsForLengths(args,rvcfname):
     if not args.alpha:
         msh_left_args.append('--singleton')
         msh_right_args.append('--singleton')
+    if args.posname is not None:
+        msh_left_args.extend(['--positions',str(args.posname)])
+        msh_right_args.extend(['--positions',str(args.posname)])
+        msh_right_args.extend(['--revpos'])
+    if args.inc_sing:
+        msh_left_args.append('--include-singletons')
+        msh_right_args.append('--include-singletons')
     if args.random_n != -1:
         totaln = getN(args,skipsub = True)
         if args.random_n > totaln:
@@ -168,6 +178,8 @@ def main(argv):
         rvcfname = args.revname
     else:
         rvcfname = vcftag+"_reversed.vcf"
+    if args.use_pypy:
+        usepypyformsh = True
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
@@ -213,10 +225,10 @@ def main(argv):
             reverse_file(rightreversedmshfname,rightmshfname)
     if args.gzip_check and isfile(rightreversedmshfname):
         os.remove(rightreversedmshfname)
-
-    est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
-    sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
-    run_estimator(est_args)
+    if not args.lengths_only:
+        est_args = [leftmshfname,rightmshfname] + splitArgsForEstimator(args)
+        sys.stderr.write("Generating estimates: %s\n" % (str(est_args)))
+        run_estimator(est_args)
 
 if __name__ == "__main__":
     main(sys.argv[1:])

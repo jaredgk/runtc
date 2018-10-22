@@ -16,10 +16,9 @@ def createParser():
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--round",dest="round",type=int,default=-1)
     parser.add_argument("--singleton",dest="singleton",action="store_true")
-    parser.add_argument("--randn-seed",dest="randn_and_seed",type=int,nargs=2)
-
-##    parser.add_argument('-l', '--list', help='delimited list input', type=str)
-    #parser.add_argument("--n0",dest="n_model",type=int,default=-1)
+    parser.add_argument("--positions",dest="posname",type=str)
+    parser.add_argument("--include-singletons",dest="inc_sing",action="store_true")
+    parser.add_argument("--revpos",dest="revpos",action="store_true")
     return parser
 
 def splitAllelesAll(la):
@@ -32,7 +31,7 @@ def splitAllelesAll(la):
         #sc = len(laa.replace('|','/').split('/'))
         for j in range(len(gts)):
             try:
-                g1 = int(laa[j])
+                g1 = int(gts[j])
             except ValueError:
                 return []
             alleles.append(g1)
@@ -100,14 +99,6 @@ def splitAlleles(la,idx_list=None):
     else:
         return splitAllelesSub(la,idx_list)
 
-def getN(la):
-    n = 0
-    for i in range(9,len(la)):
-        laa = la[i].split(':')[0]
-        sc = len(laa.replace('|','/').split('/'))
-        n += sc
-    return n
-
 def getVectors(a_prev,d_prev,cur_row,k):
     p = k+1
     q = k+1
@@ -130,14 +121,16 @@ def getVectors(a_prev,d_prev,cur_row,k):
     d.extend(e)
     return a,d
 
-def msh(a,d,pos_list,noninf_pos=None):
+def msh(a,d,pos_list,pos,sample_count):
+    if a is None:
+        return [-2 for i in range(sample_count)]
     l = len(a)
     y_msh = [0 for i in range(l)]
     site_msh = [0 for i in range(l)]
-    if noninf_pos is not None:
-        pos = noninf_pos
-    else:
-        pos = pos_list[-1]
+    #if noninf_pos is not None:
+    #    pos = noninf_pos
+    #else:
+    #    pos = pos_list[-1]
     for i in range(l):
         if i == l-1:
             c_idx = d[l-1]
@@ -250,14 +243,30 @@ def readsubfile(subname):
     sf.close()
     return idx_list
 
-def getrandomsub(la,seed,pickn):
-    import random
-    random.seed(seed)
-    sub_list =   random.sample(range(getN(la)),pickn)
-    sub_list.sort()
-    idx_list = subsampToIdx(la,sub_list)
-    return idx_list
+def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count):
+    out_string = ''
+    msh_vec = msh(a,d,pos_list,pos,sample_count)
+    gen_flag = (gen_list is not None)
+    if gen_flag:
+        g_vec = msh(a,d,gen_list,gpos,sample_count)
+    out_string += str(pos)
+    if gen_flag:
+        out_string += '\t'+str(roundSig(gpos,args.round))
+    for i in out_range:
+        out_string += '\t'+str(msh_vec[i])
+        if gen_flag:
+            out_string += ':'+str(roundSig(g_vec[i],args.round))
+    out_string += '\n'
+    return out_string
 
+def positionCondition(outpos_list,outpos_idx,pos,revpos_flag):
+    if outpos_idx == len(outpos_list):
+        return False
+    if revpos_flag and outpos_list[outpos_idx] >= pos:
+        return True
+    elif not revpos_flag and outpos_list[outpos_idx] <= pos:
+        return True
+    return False
 
 def getmsh(args):
     parser = createParser()
@@ -265,26 +274,25 @@ def getmsh(args):
 
     gen_flag = False
     sub_flag = False
-    rand_flag = False
+    pos_flag = False
     if args.genname is not None:
         gf = open(args.genname,'r')
         l1,l2 = getGenMap(gf,idx=args.genidx,squish=args.squish)
         gen_flag = True
 
     idx_list = None
-    if args.randn_and_seed is not None:
-        #randn = int(args.randn_and_seed.split()[1])
-        #seed = int(args.randn_and_seed.split()[0])
-        randn = args.randn_and_seed[1]
-        seed = args.randn_and_seed[0]
-        #idx_list = getrandomsub(seed,randn,args.n_model)
-        sub_flag = True
-        rand_flag = True
     if args.subname is not None:
         #sf = open(args.subname,'r')
         #idx_list = [int(i.strip()) for i in sf]
         sub_list = readsubfile(args.subname)
         sub_flag = True
+    if args.posname is not None:
+        posf = open(args.posname,'r')
+        outpos_list = [int(l.strip()) for l in posf]
+        if args.revpos:
+            outpos_list = outpos_list[::-1]
+        outpos_idx = 0
+        pos_flag = True
     compressed_mode = False
     if args.vcfname[-3:] == '.gz':
         compressed_mode = True
@@ -299,12 +307,15 @@ def getmsh(args):
     pos_list = []
     gen_list = None
     a = None
+    d = None
     if gen_flag:
         gen_list = []
     if args.outname is not None:
         outfn = args.outname
     else:
         raise Exception("--out option required for msh_to_vcf")
+    if pos_flag and args.singleton:
+        raise Exception("Singleton and position modes are incompatible")
     if outfn[-3:] == '.gz':
         compress_out = True
         outf = gzip.open(outfn,"w")
@@ -329,16 +340,16 @@ def getmsh(args):
         noninf_gen = None
         singleton_idx = None
         if k == 0 and sub_flag:
-            if rand_flag:
-                idx_list = getrandomsub(la,seed,randn)
-            else:
-                idx_list = subsampToIdx(la,sub_list)
+            idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
         if len(alleles) == 0:
             continue
         if sum(alleles) == 1 or sum(alleles) == len(alleles)-1:
             if not args.singleton:
-                continue
+                if not args.inc_sing:
+                    continue
+                #else:
+                #    singleton_idx = getSingletonIdx(alleles)
             else:
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
@@ -348,7 +359,28 @@ def getmsh(args):
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
             d_prev = [0 for i in range(sample_count)]
-        if not args.singleton or noninf_pos is None:
+            #msh_vec = [-2 for ii in range(sample_count)]
+            #if gen_flag:
+            #    g_vec = [-2.0 for ii in range(sample_count)]
+        if pos_flag:
+            #if outpos_list[outpos_idx] <= int(la[1]):
+            #while outpos_idx < len(outpos_list) and outpos_list[outpos_idx] <= int(la[1]):
+            while positionCondition(outpos_list,outpos_idx,int(la[1]),args.revpos):
+                opos = outpos_list[outpos_idx]
+                out_range = range(sample_count)
+                gpos = None
+                if gen_flag:
+                    gpos = float(getGenPos(opos,l1,l2))
+                out_string = getMshString(args,a,d,out_range,pos_list,gen_list,opos,gpos,sample_count)
+                writeToFile(outf,out_string,compress_out)
+                outpos_idx += 1
+            if outpos_idx == len(outpos_list):
+                break
+        if args.singleton and args.inc_sing and noninf_pos is not None:
+            out_range = [singleton_idx,singleton_idx+1]
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
+            writeToFile(outf,out_string,compress_out)
+        if not args.singleton or noninf_pos is None or args.inc_sing:
             pos_list.append(int(la[1]))
             if gen_flag:
                 gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
@@ -356,32 +388,43 @@ def getmsh(args):
             a_prev = a
             d_prev = d
             k += 1
-        if not args.singleton or noninf_pos is not None:
-            if args.singleton:
-                out_range = [singleton_idx,singleton_idx+1]
-            else:
-                out_range = range(sample_count)
-            if a is None:
-                msh_vec = [-2 for ii in range(sample_count)]
-                if gen_flag:
-                    g_vec = [-2.0 for ii in range(sample_count)]
-            else:
-                msh_vec = msh(a,d,pos_list,noninf_pos)
-                if gen_flag:
-                    g_vec = msh(a,d,gen_list,noninf_gen)
-            if noninf_pos is not None:
-                pos = noninf_pos
-            else:
-                pos = pos_list[-1]
-            writeToFile(outf,str(pos),compress_out)
-            if gen_flag:
-                genpos = float(getGenPos(pos,l1,l2))
-                writeToFile(outf,'\t'+str(roundSig(genpos,args.round)),compress_out)
-            for i in out_range:
-                writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
-                if gen_flag:
-                    writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
-            writeToFile(outf,'\n',compress_out)
+        if args.singleton and noninf_pos is not None and not args.inc_sing:
+            out_range = [singleton_idx,singleton_idx+1]
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
+            writeToFile(outf,out_string,compress_out)
+            #pos = noninf_pos
+        if not args.singleton and not pos_flag:
+            out_range = range(sample_count)
+            gpos = (None if gen_list is None else gen_list[-1])
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count)
+            writeToFile(outf,out_string,compress_out)
+        #if args.singleton and args.inc_sing:
+        #    out_range = []
+        #if not args.singleton or noninf_pos is not None:
+        #    if args.singleton:
+        #        out_range = [singleton_idx,singleton_idx+1]
+        #    else:
+        #        out_range = range(sample_count)
+        #    if noninf_pos is not None:
+        #        pos = noninf_pos
+        #        if gen_flag:
+        #            gpos = noninf_gen
+        #    else:
+        #        pos = pos_list[-1]
+        #        if gen_flag:
+        #            gpos = gen_list[-1]
+        #    msh_vec = msh(a,d,pos_list,pos)
+        #    if gen_flag:
+        #        g_vec = msh(a,d,gen_list,gpos)
+        #    writeToFile(outf,str(pos),compress_out)
+        #    if gen_flag:
+        #        genpos = float(getGenPos(pos,l1,l2))
+        #     writeToFile(outf,'\t'+str(roundSig(genpos,args.round)),compress_out)
+        #    for i in out_range:
+        #        writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
+        #        if gen_flag:
+        #            writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
+        #    writeToFile(outf,'\n',compress_out)
 
 
     outf.close()
