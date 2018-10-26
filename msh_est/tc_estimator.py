@@ -302,17 +302,17 @@ class data:
             #assert self.morgans2 != None and self.dis2 != None and self.morgans2 > 0 and self.dis2 > 0
             self.side = 2
             self.singlex = True
-            self.chi = (mu * (self.dis2) + self.morgans2 )
+            self.chi = (mu * max(1,self.dis2) + self.morgans2 )
         else:
             if self.morgans2 == None or self.dis2 == None: ## data only from side 1
                 #assert self.morgans1 != None and self.dis1 != None and self.morgans1 > 0 and self.dis1 > 0
                 self.side = 1
                 self.singlex = True
-                self.chi = (mu * (self.dis1) + self.morgans1 )
+                self.chi = (mu * max(self.dis1) + self.morgans1 )
             else:
                 self.side = 3
                 self.singlex = False
-                self.chi = (mu * (self.dis1 + self.dis2) + self.morgans1 + self.morgans2)
+                self.chi = (mu * max(1,(self.dis1 + self.dis2)) + self.morgans1 + self.morgans2)
 
     def setmodel(self,model):
         if not isinstance(model, fitmodel):
