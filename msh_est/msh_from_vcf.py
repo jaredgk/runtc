@@ -377,10 +377,15 @@ def getmsh(args):
             if outpos_idx == len(outpos_list):
                 break
         if args.singleton and args.inc_sing and noninf_pos is not None:
+            #Singleton mode, singletons included in cutoffs
+            #Current snp is singleton
+            #Outputs lengths starting at current position
             out_range = [singleton_idx,singleton_idx+1]
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
             writeToFile(outf,out_string,compress_out)
         if not args.singleton or noninf_pos is None or args.inc_sing:
+            #Only skips when in singleton mode when singleton is hit
+            #and shouldn't affect a/d
             pos_list.append(int(la[1]))
             if gen_flag:
                 gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
@@ -388,7 +393,9 @@ def getmsh(args):
             a_prev = a
             d_prev = d
             k += 1
-        if args.singleton and noninf_pos is not None and not args.inc_sing:
+        if args.singleton and not args.inc_sing and noninf_pos is not None:
+            #Singleton mode, no singletons in cutoff, but site is singleton
+            #
             out_range = [singleton_idx,singleton_idx+1]
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
             writeToFile(outf,out_string,compress_out)
