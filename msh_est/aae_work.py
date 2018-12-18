@@ -29,6 +29,8 @@ def createParser():
     parser.add_argument("--gen",dest="genname",type=str)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--pos",dest="pos",action="store_true")
+    parser.add_argument("--decmode",dest="decmode",action="store_true")
+    parser.add_argument("--expmode",dest="expmode",action="store_true")
     return parser
 
 def genFunction(val):
@@ -49,6 +51,20 @@ def floatw(v):
         return None
     return float(v)
 
+def intEndCheck(v):
+    if v is None:
+        return 0,True
+    if v[-1] == '*':
+        return int(v[:-1]),True
+    return int(v),False
+
+def floatEndCheck(v):
+    if v is None:
+        return 0,True
+    if v[-1] == '*':
+        return float(v[:-1]),True
+    return float(v),False
+
 def p(val,f):
     f.write(str(val)+'\t')
 
@@ -61,22 +77,23 @@ def getl(f):
 
 def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False,forceleftnone=None,forcerightnone=None):
     d = None
-    l1 = (la1[idx] if la1 is not None else ('-2:-2' if gen_flag else '-2'))
-    l2 = (la2[idx] if la2 is not None else ('-2:-2' if gen_flag else '-2'))
+    l1 = (la1[idx] if la1 is not None else ('0*:0*' if gen_flag else '0*'))
+    l2 = (la2[idx] if la2 is not None else ('0*:0*' if gen_flag else '0*'))
 
     if gen_flag:
-        d1 = intw(l1.split(':')[0])
-        d2 = intw(l2.split(':')[0])
-        m1 = floatw(l1.split(':')[1])
-        m2 = floatw(l2.split(':')[1])
+        d1,df1 = intEndCheck(l1.split(':')[0])
+        d2,df2 = intEndCheck(l2.split(':')[0])
+        m1,mf1 = floatEndCheck(l1.split(':')[1])
+        m2,mf2 = floatEndCheck(l2.split(':')[1])
     else:
-        d1 = intw(l1)
-        d2 = intw(l2)
+        d1,df1 = intEndCheck(l1)
+        d2,df2 = intEndCheck(l2)
         m1 = None
         m2 = None
         #m1 = (d1*rec if d1 is not None else None)
         #m2 = (d2*rec if d2 is not None else None)
-    if d1 is None and d2 is None:
+    #if d1 is None and d2 is None:
+    if df1 and df2:
         return d
     if length_offset > 0:
         if d1 is not None:
@@ -103,14 +120,12 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False
         d2 = m2 = None
     if d1 is None and d2 is None:
         return d
-    d = data(dis1 = d1,dis2 = d2, morgans1 = m1, morgans2 = m2, rho1 = rec, rho2 = rec, mu=mu, model=mod)
+    d = data(dis1 = d1,dis2 = d2, morgans1 = m1, morgans2 = m2, rho1 = rec, rho2 = rec, mu=mu, model=mod, end1=df1, end2=df2)
     return d
 
 
 def parseFilename(fn):
     fwd = fn.split('/')[-1]
-    nec = 0
-    n = 0
     ac = int(fwd.split('.')[-1])
     return ac
 
@@ -119,7 +134,7 @@ def changeModel(dl,m):
         d.model = m
 
 def parseGenLine(l,offset):
-    la = line.strip().split()
+    la = l.strip().split()
     a = float(la[0])
     b = float(la[1+offset])
     return a,b
@@ -127,7 +142,7 @@ def parseGenLine(l,offset):
 def getActiveIdx(firstla,start_inds):
     idx_list = []
     for i in range(start_inds,len(firstla)):
-        if firstla[i][0:2] != '-2':
+        if '*' in firstla[i]:
             idx_list.append(i)
     return idx_list
 
@@ -135,7 +150,7 @@ def hasmissing(la,idx_list):
     anymissing = False
     for i in idx_list:
         a = la[i]
-        if a[0:2] == '-2':
+        if '*' in a:
             anymissing = True
             break
     return anymissing
@@ -164,18 +179,18 @@ def geomean(l):
     a = np.log(b)
     return np.exp(a.sum()/len(a))
 
-def fullStr(dl):
-    d = dl[0]
-    left_side = ''
-    if d.side != 2:
-        left_side = str(d.dis1)+','+str(d.morgans1)
-    else:
-        left_side = '-1,-1'
-    if d.side != 1:
-        right_side = str(d.dis2)+','+str(d.morgans2)
-    else:
-        right_side = '-1,-1'
-    return left_side+','+right_side+','+str(d.chi)+','+str(dl.tcest)
+def fullStr(d):
+    return str(d.dis1)+':'+str(d.dis2)+':'+str(d.chi)+':'+str(d.side)+':'+str(d.singlex)
+    #left_side = ''
+    #if d.side != 2:
+    #    left_side = str(d.dis1)+','+str(d.morgans1)
+    #else:
+    #    left_side = '-1,-1'
+    #if d.side != 1:
+    #    right_side = str(d.dis2)+','+str(d.morgans2)
+    #else:
+    #    right_side = '-1,-1'
+    #return left_side+','+right_side+','+str(d.chi)+','+str(dl.tcest)
 
 def run_estimator(args):
     parser = createParser()
@@ -237,7 +252,7 @@ def run_estimator(args):
 
     l2 = getl(fr)
     la2 = l2.strip().split()
-    has_genetic_positions = (':' in la2[2])
+    has_genetic_positions = (len(la2) > 2 and ':' in la2[2])
     input_length = len(la2)
     start_inds = 1
     if has_genetic_positions:
@@ -257,8 +272,11 @@ def run_estimator(args):
 
     if args.side_check:
         idx_list = getActiveIdx(la2,start_inds)
-
-    mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
+    model_type="constant"
+    if args.expmode:
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="expgrowth",nosnp=args.alpha,g=0.01)
+    else:
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
 
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
@@ -329,31 +347,46 @@ def run_estimator(args):
         est_str = ''
         #if args.nosnp:
         dl1.clear()
-        for i in range(start_inds,input_length):
-            d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
-                         prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
-            if d is not None:
+        if not args.decmode:
+            for i in range(start_inds,input_length):
+                d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
+                            prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
+                #if d is not None:
                 dl1.append(d)
-        if len(dl1) != 0:
-            chi_list = []
-            for d in dl1:
-                chi_list.append(d.chi)
-            chi_geomean = geomean(chi_list)
-            est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
-            if args.alpha:
-                est_all_ml = geomean(est_list_ml)
+            if len(dl1) != 0:
+                chi_list = []
+                for d in dl1:
+                    if d is not None:
+                        chi_list.append(d.chi)
+                chi_geomean = geomean(chi_list)
+                est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
+                if args.alpha:
+                    est_all_ml = geomean(est_list_ml)
+                else:
+                    est_all_ml = max(est_list_ml)
+                est_str += ("\t%.4g"%recperbp)
+                est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
+                est_str += ('\t'+str(est_all_ml)+'\n')
+                if length_offset > 0:
+                    outf.write(str(prev_right_pos)+'\t'+est_str)
+                else:
+                    outf.write(str(cur_right_pos)+'\t'+est_str)
             else:
-                est_all_ml = max(est_list_ml)
-            est_str += ("\t%.4g"%recperbp)
-            est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
-            est_str += ('\t'+str(est_all_ml)+'\n')
-            if length_offset > 0:
-                outf.write(str(prev_right_pos)+'\t'+est_str)
-            else:
-                outf.write(str(cur_right_pos)+'\t'+est_str)
+                sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
+                est_str = ''
         else:
-            sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
-            est_str = ''
+            for i in range(start_inds,input_length):
+                d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
+                            prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
+                #outf.write(str(cur_right_pos)+'\t'+fullStr(d)+'\n')
+                if d is not None:
+                    dl1.append(d)
+            if len(dl1) != 0:
+                dl1.estimate_tc_kgt1()
+                est_str = (str(cur_right_pos)+'\t'+str(dl1.tcest)+'\n')
+                outf.write(est_str)
+            else:
+                outf.write(str(cur_right_pos)+'\t-1\n')
 
         ii += 1
         prev_right_pos = cur_right_pos
@@ -361,7 +394,7 @@ def run_estimator(args):
             prev_right_gen = cur_right_gen
         if right_done:
             break
-    if args.cache and args.alpha:
+    if args.cache and args.alpha and not args.decmode:
         sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":

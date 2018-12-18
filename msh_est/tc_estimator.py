@@ -260,7 +260,7 @@ class data:
                 dobayes is a boolean for whether the prior should be used or not (default is False)
     """
 
-    def __init__(self,dis1 = None, dis2=None, rho1 = None, rho2 = None, mu = None, morgans1 = None, morgans2 = None, model = None, side = None, chi = None):
+    def __init__(self,dis1 = None, dis2=None, rho1 = None, rho2 = None, mu = None, morgans1 = None, morgans2 = None, model = None, side = None, chi = None, end1 = False, end2 = False):
         """
             must have either   rho1,morgans1,dis1 all defined, or rho2,morgans2,dis2 all defined, or both
         """
@@ -298,17 +298,23 @@ class data:
             print("morgans2 and dis2 problem, can't have just one be None")
             exit()
 
-        if self.morgans1 == None or self.dis1 == None:  ## data only from side 2
+        if self.morgans1 == None or self.dis1 == None or end1:  ## data only from side 2
             #assert self.morgans2 != None and self.dis2 != None and self.morgans2 > 0 and self.dis2 > 0
             self.side = 2
             self.singlex = True
-            self.chi = (mu * max(1,self.dis2) + self.morgans2 )
+            if self.dis1 is None:
+                self.chi = (mu * max(1,self.dis2) + self.morgans2 )
+            else:
+                self.chi = (mu * max(1,(self.dis1+self.dis2)) + self.morgans1 + self.morgans2)
         else:
-            if self.morgans2 == None or self.dis2 == None: ## data only from side 1
+            if self.morgans2 == None or self.dis2 == None or end2: ## data only from side 1
                 #assert self.morgans1 != None and self.dis1 != None and self.morgans1 > 0 and self.dis1 > 0
                 self.side = 1
                 self.singlex = True
-                self.chi = (mu * max(1,self.dis1) + self.morgans1 )
+                if self.dis2 is None:
+                    self.chi = (mu * max(1,self.dis1) + self.morgans1 )
+                else:
+                    self.chi = (mu * max(1,(self.dis1+self.dis2)) + self.morgans1 + self.morgans2)
             else:
                 self.side = 3
                 self.singlex = False
@@ -602,6 +608,9 @@ class datalist(list):
         """
         tclist = []
         for d in self:
+            if d is None:
+                tclist.append(1)
+                continue
             chi = d.chi
             if round != -1:
                 chi = roundChi(chi,round)

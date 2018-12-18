@@ -178,8 +178,7 @@ def main(argv):
         rvcfname = args.revname
     else:
         rvcfname = vcftag+"_reversed.vcf"
-    if args.use_pypy:
-        usepypyformsh = True
+    usepypyformsh = args.use_pypy
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))

@@ -67,18 +67,6 @@ def subsampToIdx(la,sub_list):
 
 def splitAllelesSub(la,idx_list):
     alleles = []
-    ac = 0
-    an = 0
-    #for i in range(len(idx_list)):
-    #    reg = (idx_list[i]%2)*2
-    #    f_idx = (idx_list[i]//2)+9
-    #    try:
-    #        geno = int(la[f_idx][reg])
-    #    except ValueError:
-    #        return []
-    #    alleles.append(geno)
-    #    ac += geno
-    #    an += 1
     for i in range(len(idx_list)):
         ip = idx_list[i]
         laa = la[ip[0]].split(':')[0]
@@ -123,7 +111,7 @@ def getVectors(a_prev,d_prev,cur_row,k):
 
 def msh(a,d,pos_list,pos,sample_count):
     if a is None:
-        return [-2 for i in range(sample_count)]
+        return ['0*' for i in range(sample_count)]
     l = len(a)
     y_msh = [0 for i in range(l)]
     site_msh = [0 for i in range(l)]
@@ -139,7 +127,7 @@ def msh(a,d,pos_list,pos,sample_count):
         else:
             c_idx = min(d[i],d[i+1])
         if c_idx == 0:
-            y_msh[i] = -2
+            y_msh[i] = str(abs(pos-pos_list[0]))+'*'
         else:
             y_msh[i] = abs(pos - pos_list[c_idx-1])
     for a_i,a_v in enumerate(a):
@@ -159,6 +147,12 @@ def roundSig(f,n):
     if f == 0.0:
         return 0.0
     return round(f,-int(math.floor(math.log10(abs(f))))+(n-1))
+
+def roundStar(f,n):
+    sf = str(f)
+    if sf[-1] == '*':
+        return str(roundSig(int(sf[:-1]),n))+'*'
+    return str(roundSig(f,n))
 
 def parseGenLine(la,offset):
     a = float(la[0])
