@@ -274,7 +274,7 @@ def run_estimator(args):
         idx_list = getActiveIdx(la2,start_inds)
     model_type="constant"
     if args.expmode:
-        mc = fitmodel(n=n_model,N0=n0_model,popmodel="expgrowth",nosnp=args.alpha,g=0.01)
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="twophase",te=129.5,nosnp=args.alpha,g=0.01)
     else:
         mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
 

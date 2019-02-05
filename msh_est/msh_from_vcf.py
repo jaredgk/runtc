@@ -336,7 +336,7 @@ def getmsh(args):
         if k == 0 and sub_flag:
             idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
-        if len(alleles) == 0:
+        if len(alleles) == 0 or sum(alleles) == 0 or sum(alleles) == len(alleles):
             continue
         if sum(alleles) == 1 or sum(alleles) == len(alleles)-1:
             if not args.singleton:
