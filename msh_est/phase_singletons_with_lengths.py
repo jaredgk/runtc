@@ -17,7 +17,8 @@ def findSingleton(la):
             return i
     raise Exception("No singleton found")
 
-def parseChi(f1,f2,mutrate):
+
+def parseChi(f1,f2):
     if ':' in f1:
         fa1 = f1.split(':')
         fa2 = f2.split(':')
@@ -25,17 +26,35 @@ def parseChi(f1,f2,mutrate):
         phys2 = (int(fa2[0]) if '*' not in fa2[0] else int(fa2[0][:-1]))
         gen1 = (float(fa1[1]) if '*' not in fa1[1] else float(fa1[1][:-1]))
         gen2 = (float(fa2[1]) if '*' not in fa2[1] else float(fa2[1][:-1]))
-        chi = float(phys1)*mutrate+float(phys2)*mutrate+gen1+gen2
-        return chi
+        phys = phys1+phys2
+        gen = gen1 + gen2
+        return phys, gen
+        #chi = float(phys1)*mutrate+float(phys2)*mutrate+gen1+gen2
+        #return chi
     phys1 = (int(f1) if '*' not in f1 else int(f1[:-1]))
     phys2 = (int(f2) if '*' not in f2 else int(f2[:-1]))
-    #sys.stderr.write(str(phys1)+'\t'+str(phys2)+'\n')
-    chi = float(phys1)*mutrate+float(phys2)*mutrate
-    return chi
+    return phys1+phys2, None
+
+def computeChi(f1,f2,mutrate):
+    phys, gen = parseChi(f1,f2)
+    if gen is None:
+        return float(phys)*mutrate
+    return float(phys)*mutrate + gen
+
+def getStatString(current_left_la,current_right_la,geno):
+    if geno[0] != '0':
+        physl,genl = parseChi(current_left_la[-2],current_right_la[-2])
+        physr,genr = parseChi(current_left_la[-1],current_right_la[-1])
+    else:
+        physr,genr = parseChi(current_left_la[-2],current_right_la[-2])
+        physl,genl = parseChi(current_left_la[-1],current_right_la[-1])
+    if genl is None:
+        return str(physl)+'\t'+str(physr)
+    return str(physl)+'\t'+str(physr)+'\t'+str(genl)+'\t'+str(genr)
 
 def phaseSingleton(orig_geno,current_left_la,current_right_la,mutrate):
-    chi_1 = parseChi(current_left_la[-2],current_right_la[-2],mutrate)
-    chi_2 = parseChi(current_left_la[-1],current_right_la[-1],mutrate)
+    chi_1 = computeChi(current_left_la[-2],current_right_la[-2],mutrate)
+    chi_2 = computeChi(current_left_la[-1],current_right_la[-1],mutrate)
     new_geno = ('0|1' if chi_1 > chi_2 else '1|0')
     return new_geno, (new_geno[0] == orig_geno[0])
 
@@ -92,7 +111,7 @@ def phase_with_lengths(sysargs):
                 new_geno, changed = phaseSingleton(la[i],current_left_la,current_right_la,args.mutrate)
                 sys.stdout.write(new_geno)
                 if args.statfile is not None:
-                    statf.write(la[1]+'\t'+str(singleton_idx)+'\t'+str(changed)+'\n')
+                    statf.write(la[1]+'\t'+str(singleton_idx)+'\t'+getStatString(current_left_la,current_right_la,la[i])+'\n')
             if i != len(la)-1:
                 sys.stdout.write('\t')
             else:

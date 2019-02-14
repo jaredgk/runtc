@@ -19,6 +19,8 @@ def createParser():
     parser.add_argument("--positions",dest="posname",type=str)
     parser.add_argument("--include-singletons",dest="inc_sing",action="store_true")
     parser.add_argument("--revpos",dest="revpos",action="store_true")
+    parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
+                        "lengths for every k-ton"))
     return parser
 
 def splitAllelesAll(la):
@@ -115,10 +117,7 @@ def msh(a,d,pos_list,pos,sample_count):
     l = len(a)
     y_msh = [0 for i in range(l)]
     site_msh = [0 for i in range(l)]
-    #if noninf_pos is not None:
-    #    pos = noninf_pos
-    #else:
-    #    pos = pos_list[-1]
+
     for i in range(l):
         if i == l-1:
             c_idx = d[l-1]
@@ -133,6 +132,22 @@ def msh(a,d,pos_list,pos,sample_count):
     for a_i,a_v in enumerate(a):
         site_msh[a_v] = y_msh[a_i]
     return site_msh
+
+def reconstructDVector(d,idx):
+    d_prime = [0 for i in d]
+    for i in range(idx-1,-1,-1):
+        d_prime[i] = max(d[i+1:idx+1])
+    for i in range(idx+1,len(d)):
+        d_prime[i] = max(d[idx+1:i+1])
+    return d_prime
+
+def setInvertA(a,idx_list):
+    a_set = []
+    for idx in idx_list:
+        a_set.append(a.index(idx))
+    return a_set
+
+#def findOutgroupHap(a,d,hap_idx,idx_list)
 
 
 def roundSig(f,n):
@@ -293,11 +308,9 @@ def getmsh(args):
         vcf = gzip.open(args.vcfname,'r')
     else:
         vcf = open(args.vcfname,'r')
-    a_mat = []
-    d_mat = []
-    m_mat = []
 
-    k = 0
+
+    snp_count = 0
     pos_list = []
     gen_list = None
     a = None
@@ -333,10 +346,11 @@ def getmsh(args):
         noninf_pos = None
         noninf_gen = None
         singleton_idx = None
-        if k == 0 and sub_flag:
+        if snp_count == 0 and sub_flag:
             idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
-        if len(alleles) == 0 or sum(alleles) == 0 or sum(alleles) == len(alleles):
+        ac = sum(alleles)
+        if len(alleles) == 0 or ac == 0 or ac == len(alleles):
             continue
         if sum(alleles) == 1 or sum(alleles) == len(alleles)-1:
             if not args.singleton:
@@ -349,7 +363,7 @@ def getmsh(args):
                 singleton_idx = getSingletonIdx(alleles)
                 if gen_flag:
                     noninf_gen = float(getGenPos(noninf_pos,l1,l2))
-        if k == 0:
+        if snp_count == 0:
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
             d_prev = [0 for i in range(sample_count)]
@@ -370,7 +384,8 @@ def getmsh(args):
                 outpos_idx += 1
             if outpos_idx == len(outpos_list):
                 break
-        if args.singleton and args.inc_sing and noninf_pos is not None:
+        #if args.singleton and args.inc_sing and noninf_pos is not None:
+        if args.singleton and noninf_pos is not None:
             #Singleton mode, singletons included in cutoffs
             #Current snp is singleton
             #Outputs lengths starting at current position
@@ -383,18 +398,19 @@ def getmsh(args):
             pos_list.append(int(la[1]))
             if gen_flag:
                 gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
-            a,d = getVectors(a_prev,d_prev,alleles,k)
+            a,d = getVectors(a_prev,d_prev,alleles,snp_count)
             a_prev = a
             d_prev = d
-            k += 1
-        if args.singleton and not args.inc_sing and noninf_pos is not None:
+            snp_count += 1
+        #if args.singleton and not args.inc_sing and noninf_pos is not None:
             #Singleton mode, no singletons in cutoff, but site is singleton
             #
-            out_range = [singleton_idx,singleton_idx+1]
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
-            writeToFile(outf,out_string,compress_out)
+        #    out_range = [singleton_idx,singleton_idx+1]
+        #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
+        #    writeToFile(outf,out_string,compress_out)
             #pos = noninf_pos
         if not args.singleton and not pos_flag:
+            #Standard alpha use
             out_range = range(sample_count)
             gpos = (None if gen_list is None else gen_list[-1])
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count)
