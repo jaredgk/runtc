@@ -133,6 +133,16 @@ def msh(a,d,pos_list,pos,sample_count):
         site_msh[a_v] = y_msh[a_i]
     return site_msh
 
+def getDSingle(a,d,idx,sample_count):
+    if a is None:
+        return -1
+    aidx = a.index(idx)
+    if aidx == sample_count - 1:
+        return d[sample_count-1]
+    elif aidx == 0:
+        return d[1]
+    return min(d[aidx],d[aidx+1])
+
 def reconstructDVector(d,idx):
     d_prime = [0 for i in d]
     for i in range(idx-1,-1,-1):
@@ -146,6 +156,67 @@ def setInvertA(a,idx_list):
     for idx in idx_list:
         a_set.append(a.index(idx))
     return a_set
+
+def printAD(a,d,idx,idx_list):
+    d_prime = reconstructDVector(d,idx)
+    sys.stdout.write('\t'.join(map(str,idx_list))+'\n')
+    #sys.stdout.write('\t'.join(map(str,d_prime))+'\n')
+    #sys.stdout.write('\t'.join(map(str,d))+'\n')
+    #sys.stdout.write('\t'.join(map(str,a))+'\n')
+    a_prime = [(aa in idx_list) for aa in a]
+    #sys.stdout.write('\t'.join(map(str,a_prime))+'\n')
+    for i,rec in enumerate(zip(map(str,d),map(str,d_prime),map(str,a),map(str,a_prime))):
+        sys.stdout.write(str(i)+'\t' +'\t'.join(rec)+'\n')
+
+def getDKton(a,d,idx,sample_count,idx_list):
+    if a is None:
+        return -1
+    if idx not in idx_list:
+        raise Exception("Index %d not in index list %s" %(a[idx],str(idx_list)))
+    d_low = 0
+    d_hi = 0
+    a_idx = a.index(idx)
+    hi_valid = False
+    low_valid = False
+    printAD(a,d,idx,idx_list)
+    if a_idx != 0:
+        d_low = d[a_idx]
+        low_valid = True
+    if a_idx != len(a)-1:
+        d_hi = d[a_idx+1]
+        hi_valid = True
+    i = a_idx-1
+    #while i >= 0 and a[i] in idx_list:
+    if a_idx > 0 and a[a_idx-1] in idx_list:
+        low_valid = False
+        while i >= 1:
+            sys.stdout.write("low "+str(i)+'\n')
+            d_low = max(d_low,d[i])
+            if a[i-1] not in idx_list:
+                low_valid = True
+                break
+            i -= 1
+    i = a_idx+2
+    #i = idx+1
+    #while i < sample_count and d_low < d_hi and a[i] in idx_list:
+    if a_idx < sample_count-1 and a[a_idx+1] in idx_list:
+        hi_valid = False
+        while i < sample_count:
+            sys.stdout.write("high "+str(i)+'\n')
+            d_hi = max(d_hi,d[i])
+            if a[i] not in idx_list:
+                hi_valid = True
+                break
+            i += 1
+    sys.stdout.write(str(low_valid)+'\t'+str(hi_valid)+'\n')
+    sys.stdout.write(str(d_low)+'\t'+str(d_hi)+'\n')
+    #if a_idx == len(a)-1:
+    if not hi_valid:
+        return d_low
+    #if a_idx == 0:
+    if not low_valid:
+        return d_hi
+    return min(d_hi,d_low)
 
 #def findOutgroupHap(a,d,hap_idx,idx_list)
 
@@ -252,19 +323,51 @@ def readsubfile(subname):
     sf.close()
     return idx_list
 
-def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count):
+def getKIdxList(alleles,k):
+    ac = sum(alleles)
+    target_allele = 0
+    out_idx = []
+    if ac == k:
+        target_allele = 1
+    for i in range(len(alleles)):
+        if alleles[i] == target_allele:
+            out_idx.append(i)
+    return out_idx
+
+def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_list=None):
     out_string = ''
-    msh_vec = msh(a,d,pos_list,pos,sample_count)
+    #msh_vec = msh(a,d,pos_list,pos,sample_count)
     gen_flag = (gen_list is not None)
-    if gen_flag:
-        g_vec = msh(a,d,gen_list,gpos,sample_count)
+    #if gen_flag:
+    #    g_vec = msh(a,d,gen_list,gpos,sample_count)
     out_string += str(pos)
     if gen_flag:
         out_string += '\t'+str(roundSig(gpos,args.round))
+    #if idx_list is None:
     for i in out_range:
-        out_string += '\t'+str(msh_vec[i])
+        if idx_list is None:
+            d_idx = getDSingle(a,d,i,sample_count)
+        else:
+            sys.stdout.write("POS: "+str(pos)+'\t'+str(i)+'\t'+str(idx_list)+'\n')
+            d_idx = getDKton(a,d,i,sample_count,idx_list)
+            #sys.stdout.write(str(d_idx)+'')
+        #sys.stderr.write(str(d_idx)+'\n')
+        if d_idx == -1:
+            pos_len = '0*'
+        elif d_idx == 0:
+            pos_len = str(abs(pos-pos_list[d_idx]))+'*'
+        else:
+            pos_len = str(abs(pos-pos_list[d_idx-1]))
+        out_string += '\t'+pos_len
         if gen_flag:
-            out_string += ':'+str(roundSig(g_vec[i],args.round))
+            if d_idx == -1:
+                gen_len = '0.0*'
+            elif d_idx == 0:
+                gen_len = str(abs(roundSig(gpos-gen_list[0],args.round)))+'*'
+            else:
+                gen_len = str(abs(roundSig(gpos-gen_list[d_idx-1],args.round)))
+            #gen_len = abs(gen-gen_list[d_idx])
+            out_string += ':'+gen_len
     out_string += '\n'
     return out_string
 
@@ -308,6 +411,7 @@ def getmsh(args):
         vcf = gzip.open(args.vcfname,'r')
     else:
         vcf = open(args.vcfname,'r')
+    k = args.k_val
 
 
     snp_count = 0
@@ -346,13 +450,16 @@ def getmsh(args):
         noninf_pos = None
         noninf_gen = None
         singleton_idx = None
+        k_idxlist = None
+        k_pos = None
+        k_gen = None
         if snp_count == 0 and sub_flag:
             idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
         ac = sum(alleles)
         if len(alleles) == 0 or ac == 0 or ac == len(alleles):
             continue
-        if sum(alleles) == 1 or sum(alleles) == len(alleles)-1:
+        if ac == 1 or ac == len(alleles)-1:
             if not args.singleton:
                 if not args.inc_sing:
                     continue
@@ -363,6 +470,11 @@ def getmsh(args):
                 singleton_idx = getSingletonIdx(alleles)
                 if gen_flag:
                     noninf_gen = float(getGenPos(noninf_pos,l1,l2))
+        if k is not None and (ac == k or ac == len(alleles) - k):
+            k_idxlist = getKIdxList(alleles,k)
+            k_pos = int(la[1])
+            if gen_flag:
+                k_gen = float(getGenPos(k_pos,l1,l2))
         if snp_count == 0:
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
@@ -379,18 +491,23 @@ def getmsh(args):
                 gpos = None
                 if gen_flag:
                     gpos = float(getGenPos(opos,l1,l2))
-                out_string = getMshString(args,a,d,out_range,pos_list,gen_list,opos,gpos,sample_count)
+                out_string = getMshString(args,a,d,out_range,pos_list,gen_list,opos,gpos,sample_countk,k_idxlist)
                 writeToFile(outf,out_string,compress_out)
                 outpos_idx += 1
             if outpos_idx == len(outpos_list):
                 break
         #if args.singleton and args.inc_sing and noninf_pos is not None:
-        if args.singleton and noninf_pos is not None:
+        if (args.singleton and noninf_pos is not None):
             #Singleton mode, singletons included in cutoffs
             #Current snp is singleton
             #Outputs lengths starting at current position
             out_range = [singleton_idx,singleton_idx+1]
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
+            writeToFile(outf,out_string,compress_out)
+        if k_idxlist is not None:
+            out_range = k_idxlist
+            sys.stderr.write(str(k_idxlist)+'\n')
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
         if not args.singleton or noninf_pos is None or args.inc_sing:
             #Only skips when in singleton mode when singleton is hit
@@ -409,11 +526,11 @@ def getmsh(args):
         #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
         #    writeToFile(outf,out_string,compress_out)
             #pos = noninf_pos
-        if not args.singleton and not pos_flag:
+        if not args.singleton and not pos_flag and k is None:
             #Standard alpha use
             out_range = range(sample_count)
             gpos = (None if gen_list is None else gen_list[-1])
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count)
+            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
         #if args.singleton and args.inc_sing:
         #    out_range = []
