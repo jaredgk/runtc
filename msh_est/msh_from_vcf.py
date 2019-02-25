@@ -178,7 +178,7 @@ def getDKton(a,d,idx,sample_count,idx_list):
     a_idx = a.index(idx)
     hi_valid = False
     low_valid = False
-    printAD(a,d,idx,idx_list)
+    #printAD(a,d,idx,idx_list)
     if a_idx != 0:
         d_low = d[a_idx]
         low_valid = True
@@ -190,7 +190,7 @@ def getDKton(a,d,idx,sample_count,idx_list):
     if a_idx > 0 and a[a_idx-1] in idx_list:
         low_valid = False
         while i >= 1:
-            sys.stdout.write("low "+str(i)+'\n')
+            #sys.stdout.write("low "+str(i)+'\n')
             d_low = max(d_low,d[i])
             if a[i-1] not in idx_list:
                 low_valid = True
@@ -202,14 +202,14 @@ def getDKton(a,d,idx,sample_count,idx_list):
     if a_idx < sample_count-1 and a[a_idx+1] in idx_list:
         hi_valid = False
         while i < sample_count:
-            sys.stdout.write("high "+str(i)+'\n')
+            #sys.stdout.write("high "+str(i)+'\n')
             d_hi = max(d_hi,d[i])
             if a[i] not in idx_list:
                 hi_valid = True
                 break
             i += 1
-    sys.stdout.write(str(low_valid)+'\t'+str(hi_valid)+'\n')
-    sys.stdout.write(str(d_low)+'\t'+str(d_hi)+'\n')
+    #sys.stdout.write(str(low_valid)+'\t'+str(hi_valid)+'\n')
+    #sys.stdout.write(str(d_low)+'\t'+str(d_hi)+'\n')
     #if a_idx == len(a)-1:
     if not hi_valid:
         return d_low
@@ -348,10 +348,7 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
         if idx_list is None:
             d_idx = getDSingle(a,d,i,sample_count)
         else:
-            sys.stdout.write("POS: "+str(pos)+'\t'+str(i)+'\t'+str(idx_list)+'\n')
             d_idx = getDKton(a,d,i,sample_count,idx_list)
-            #sys.stdout.write(str(d_idx)+'')
-        #sys.stderr.write(str(d_idx)+'\n')
         if d_idx == -1:
             pos_len = '0*'
         elif d_idx == 0:
@@ -506,7 +503,6 @@ def getmsh(args):
             writeToFile(outf,out_string,compress_out)
         if k_idxlist is not None:
             out_range = k_idxlist
-            sys.stderr.write(str(k_idxlist)+'\n')
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
         if not args.singleton or noninf_pos is None or args.inc_sing:
