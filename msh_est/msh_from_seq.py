@@ -9,7 +9,7 @@ import gc
 def createParser():
     parser = argparse.ArgumentParser()
     parser.add_argument("--gen",dest="genname")
-    parser.add_argument("--vcf",dest="vcfname")
+    parser.add_argument("--inf",dest="vcfname")
     parser.add_argument("--sub",dest="subname")
     parser.add_argument("--out",dest="outname")
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
@@ -21,7 +21,7 @@ def createParser():
     parser.add_argument("--revpos",dest="revpos",action="store_true")
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
-    parser.add_argument("--k-all",dest="k_all",action="store_true")
+    parser.add_argument("--ad-dump",dest="ad_pref",type=str)
     return parser
 
 def splitAllelesAll(la):
@@ -378,6 +378,47 @@ def positionCondition(outpos_list,outpos_idx,pos,revpos_flag):
         return True
     return False
 
+def getNextSeqList(in_file):
+    #line = in_file.readline()
+    #if len(line.strip()) == 0:
+    #    return []
+    get_next = False
+    allele_list = []
+    pos_list = []
+    while True:
+        line = in_file.readline()
+        #sys.stderr.write(str(len(line))+'\n')
+        if len(line) == 0:
+            return allele_list,pos_list
+        if line[:2] == 'ms':
+            return allele_list,pos_list
+        if line[:9] == 'positions':
+            get_next = True
+            la = line.strip().split()
+            pos_list = [float(aa)*10000 for aa in la[1:]]
+            continue
+        if get_next:
+            if len(allele_list) == 0:
+                allele_list.extend([[] for i in range(len(line.strip()))])
+            for i in range(len(line.strip())):
+                allele_list[i].append(int(line[i]))
+
+def subIdxForPos(d,pos_list):
+    out_v = []
+    for i in range(len(d)):
+        out_v.append(pos_list[d[i]])
+    return out_v
+
+def parsePopsCutoff(fl):
+    la = fl.strip().split()
+    iidx = la.index('-I')
+    if la[iidx+1] != '2':
+        raise Exception("Currently only supports two populations")
+    return int(la[iidx+2])
+
+
+
+
 def getmsh(args):
     parser = createParser()
     args = parser.parse_args(args)
@@ -411,6 +452,10 @@ def getmsh(args):
         vcf = open(args.vcfname,'r')
     k = args.k_val
 
+    if args.ad_pref is not None:
+        amat_file = open(args.ad_pref+"_amat.txt",'w')
+        dmat_file = open(args.ad_pref+"_dmat.txt",'w')
+
 
     snp_count = 0
     pos_list = []
@@ -419,123 +464,110 @@ def getmsh(args):
     d = None
     if gen_flag:
         gen_list = []
-    if args.outname is not None:
-        outfn = args.outname
-    else:
-        raise Exception("--out option required for msh_to_vcf")
+    #if args.outname is not None:
+    #    outfn = args.outname
+    #else:
+    #    raise Exception("--out option required for msh_to_vcf")
     if pos_flag and args.singleton:
         raise Exception("Singleton and position modes are incompatible")
-    if outfn[-3:] == '.gz':
-        compress_out = True
-        outf = gzip.open(outfn,"w")
-    else:
-        compress_out = False
-        outf = open(outfn,"w")
-    for line in vcf:
-        if compressed_mode:
-            line = line.decode()
-        if line[0] == '#' or line[0] == '\n':
-            continue
-        la = line.strip().split()
-        try:
-            if 'CPG_TAG' in la[7]:
+    #if outfn[-3:] == '.gz':
+    #    compress_out = True
+    #    outf = gzip.open(outfn,"w")
+    #else:
+    #    compress_out = False
+    #    outf = open(outfn,"w")
+    first_header = vcf.readline()
+    pop_cutoff = parsePopsCutoff(first_header)
+    while True:
+        allele_list,pos_list = getNextSeqList(vcf)
+        if len(allele_list) == 0:
+            break
+        pos_t = 0
+        for alleles in allele_list:
+            #la = line.strip().split()
+            noninf_pos = None
+            noninf_gen = None
+            singleton_idx = None
+            k_idxlist = None
+            k_pos = None
+            k_gen = None
+            #if snp_count == 0 and sub_flag:
+            #    idx_list = subsampToIdx(la,sub_list)
+            #alleles = [int(ii) for ii in la ]
+            ac = sum(alleles)
+            if len(alleles) == 0 or ac == 0 or ac == len(alleles):
                 continue
-            lastline = la
-        except Exception:
-            pass
-        if len(la[3]) != 1 or len(la[4]) != 1:
-            continue
-        noninf_pos = None
-        noninf_gen = None
-        singleton_idx = None
-        k_idxlist = None
-        k_pos = None
-        k_gen = None
-        if snp_count == 0 and sub_flag:
-            idx_list = subsampToIdx(la,sub_list)
-        alleles = splitAlleles(la,idx_list)
-        ac = sum(alleles)
-        if len(alleles) == 0 or ac == 0 or ac == len(alleles):
-            continue
-        if ac == 1 or ac == len(alleles)-1:
-            if not args.singleton:
-                if not args.inc_sing:
-                    continue
-                #else:
-                #    singleton_idx = getSingletonIdx(alleles)
-            #else:
-            elif not args.k_all:
-                noninf_pos = int(la[1])
-                singleton_idx = getSingletonIdx(alleles)
+            if ac == 1 or ac == len(alleles)-1:
+                if not args.singleton:
+                    if not args.inc_sing:
+                        continue
+                else:
+                    noninf_pos = pos_t
+                    singleton_idx = getSingletonIdx(alleles)
+                    if gen_flag:
+                        noninf_gen = float(getGenPos(noninf_pos,l1,l2))
+            #if k is not None and (ac == k or ac == len(alleles) - k):
+            #    k_idxlist = getKIdxList(alleles,k)
+            #    k_pos = pos_t
+            #    if gen_flag:
+            #        k_gen = float(getGenPos(k_pos,l1,l2))
+            if pos_t == 0:
+                sample_count = len(alleles)
+                a_prev = [i for i in range(sample_count)]
+                d_prev = [0 for i in range(sample_count)]
+                #msh_vec = [-2 for ii in range(sample_count)]
+                #if gen_flag:
+                #    g_vec = [-2.0 for ii in range(sample_count)]
+            #if args.singleton and args.inc_sing and noninf_pos is not None:
+            #if (args.singleton and noninf_pos is not None):
+                #Singleton mode, singletons included in cutoffs
+                #Current snp is singleton
+                #Outputs lengths starting at current position
+            #    out_range = [singleton_idx,singleton_idx+1]
+            #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
+            #    writeToFile(outf,out_string,compress_out)
+            #if k_idxlist is not None:
+            #    out_range = k_idxlist
+            #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
+            #    writeToFile(outf,out_string,compress_out)
+            if not args.singleton or noninf_pos is None or args.inc_sing:
+                #Only skips when in singleton mode when singleton is hit
+                #and shouldn't affect a/d
+                pos_list.append(pos_t)
                 if gen_flag:
-                    noninf_gen = float(getGenPos(noninf_pos,l1,l2))
-        if k is not None and (ac == k or ac == len(alleles) - k):
-            k_idxlist = getKIdxList(alleles,k)
-            k_pos = int(la[1])
-            if gen_flag:
-                k_gen = float(getGenPos(k_pos,l1,l2))
-        if args.k_all:
-            k_idxlist = getKIdxList(alleles,ac)
-            k_pos = int(la[1])
-            if gen_flag:
-                k_gen = float(getGenPos(k_pos,l1,l2))
+                    gen_list.append(float(getGenPos(pos_t,l1,l2)))
+                a,d = getVectors(a_prev,d_prev,alleles,pos_t)
 
-        if snp_count == 0:
-            sample_count = len(alleles)
-            a_prev = [i for i in range(sample_count)]
-            d_prev = [0 for i in range(sample_count)]
-            #msh_vec = [-2 for ii in range(sample_count)]
-            #if gen_flag:
-            #    g_vec = [-2.0 for ii in range(sample_count)]
-        if pos_flag:
-            #if outpos_list[outpos_idx] <= int(la[1]):
-            #while outpos_idx < len(outpos_list) and outpos_list[outpos_idx] <= int(la[1]):
-            while positionCondition(outpos_list,outpos_idx,int(la[1]),args.revpos):
-                opos = outpos_list[outpos_idx]
-                out_range = range(sample_count)
-                gpos = None
-                if gen_flag:
-                    gpos = float(getGenPos(opos,l1,l2))
-                out_string = getMshString(args,a,d,out_range,pos_list,gen_list,opos,gpos,sample_count,k_idxlist)
-                writeToFile(outf,out_string,compress_out)
-                outpos_idx += 1
-            if outpos_idx == len(outpos_list):
-                break
-        #if args.singleton and args.inc_sing and noninf_pos is not None:
-        if (args.singleton and noninf_pos is not None):
-            #Singleton mode, singletons included in cutoffs
-            #Current snp is singleton
-            #Outputs lengths starting at current position
-            out_range = [singleton_idx,singleton_idx+1]
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
-            writeToFile(outf,out_string,compress_out)
-        if k_idxlist is not None:
-            out_range = k_idxlist
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
-            writeToFile(outf,out_string,compress_out)
-        if not args.singleton or noninf_pos is None or args.inc_sing:
-            #Only skips when in singleton mode when singleton is hit
-            #and shouldn't affect a/d
-            pos_list.append(int(la[1]))
-            if gen_flag:
-                gen_list.append(float(getGenPos(int(la[1]),l1,l2)))
-            a,d = getVectors(a_prev,d_prev,alleles,snp_count)
-            a_prev = a
-            d_prev = d
-            snp_count += 1
-        #if args.singleton and not args.inc_sing and noninf_pos is not None:
-            #Singleton mode, no singletons in cutoff, but site is singleton
-            #
-        #    out_range = [singleton_idx,singleton_idx+1]
-        #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
-        #    writeToFile(outf,out_string,compress_out)
-            #pos = noninf_pos
-        if not args.singleton and not pos_flag and k is None:
-            #Standard alpha use
-            out_range = range(sample_count)
-            gpos = (None if gen_list is None else gen_list[-1])
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
-            writeToFile(outf,out_string,compress_out)
+                #Mod vectors to divide by population
+                #pop_dist_vector = [(0 if i < pop_cutoff else 1) for i in range(sample_count)]
+                #a_pop = getVectors(a,d,pop_dist_vector,pos_t)
+
+
+                a_prev = a
+                d_prev = d
+                snp_count += 1
+            #if args.singleton and not args.inc_sing and noninf_pos is not None:
+                #Singleton mode, no singletons in cutoff, but site is singleton
+                #
+            #    out_range = [singleton_idx,singleton_idx+1]
+            #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
+            #    writeToFile(outf,out_string,compress_out)
+                #pos = noninf_pos
+            #if not args.singleton and not pos_flag and k is None:
+            #    #Standard alpha use
+            #    out_range = range(sample_count)
+            #    gpos = (None if gen_list is None else gen_list[-1])
+            #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
+            #    writeToFile(outf,out_string,compress_out)
+
+            if args.ad_pref is not None:
+                amat_file.write('\t'.join(map(str,a))+'\n')
+                dmat_file.write('\t'.join(map(str,d))+'\n')
+                #d_mod = subIdxForPos(d,pos_list)
+                #dmat_file.write('\t'.join(map(str,d_mod))+'\n')
+            pos_t += 1
+        amat_file.write('\n')
+        dmat_file.write('\n')
         #if args.singleton and args.inc_sing:
         #    out_range = []
         #if not args.singleton or noninf_pos is not None:
@@ -565,8 +597,8 @@ def getmsh(args):
         #    writeToFile(outf,'\n',compress_out)
 
 
-    outf.close()
-    return outfn
+    #outf.close()
+    #return outfn
 
 if __name__ == "__main__":
     getmsh(sys.argv[1:])

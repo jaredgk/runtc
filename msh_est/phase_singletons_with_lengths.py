@@ -56,6 +56,7 @@ def phaseSingleton(orig_geno,current_left_la,current_right_la,mutrate):
     chi_1 = computeChi(current_left_la[-2],current_right_la[-2],mutrate)
     chi_2 = computeChi(current_left_la[-1],current_right_la[-1],mutrate)
     new_geno = ('0|1' if chi_1 > chi_2 else '1|0')
+    #new_geno = ('0|1' if chi_1 < chi_2 else '1|0')
     return new_geno, (new_geno[0] == orig_geno[0])
 
 

@@ -351,8 +351,8 @@ def run_estimator(args):
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
                             prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
-                #if d is not None:
-                dl1.append(d)
+                if d is not None:
+                    dl1.append(d)
             if len(dl1) != 0:
                 chi_list = []
                 for d in dl1:
@@ -375,6 +375,7 @@ def run_estimator(args):
                 sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
                 est_str = ''
         else:
+            input_length = len(la2)
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
                             prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
