@@ -22,6 +22,7 @@ def createParser():
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
     parser.add_argument("--k-all",dest="k_all",action="store_true")
+    parser.add_argument("--k-range",dest="k_range",nargs=2,type=int)
     return parser
 
 def splitAllelesAll(la):
@@ -464,7 +465,7 @@ def getmsh(args):
                 #else:
                 #    singleton_idx = getSingletonIdx(alleles)
             #else:
-            elif not args.k_all:
+            elif (not args.k_all and args.k_range is None):
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
                 if gen_flag:
@@ -475,6 +476,11 @@ def getmsh(args):
             if gen_flag:
                 k_gen = float(getGenPos(k_pos,l1,l2))
         if args.k_all:
+            k_idxlist = getKIdxList(alleles,ac)
+            k_pos = int(la[1])
+            if gen_flag:
+                k_gen = float(getGenPos(k_pos,l1,l2))
+        if args.k_range is not None and ac >= args.k_range[0] and ac <= args.k_range[1]:
             k_idxlist = getKIdxList(alleles,ac)
             k_pos = int(la[1])
             if gen_flag:

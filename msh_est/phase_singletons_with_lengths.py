@@ -12,10 +12,33 @@ def createParser():
     return parser
 
 def findSingleton(la):
+    alleles = []
+    ac = 0
+    an = 0
     for i in range(9,len(la)):
-        if '1' in la[i][0:3]:
-            return i
-    raise Exception("No singleton found")
+        laa = la[i].split(':')[0]
+        gts = laa.replace('|','/').split('/')
+        #sc = len(laa.replace('|','/').split('/'))
+        for j in range(len(gts)):
+            try:
+                g1 = int(gts[j])
+            except ValueError:
+                return []
+            alleles.append(g1)
+            ac += g1
+            an += 1
+    if alleles.count(1) == 1:
+        return (alleles.index(1)//2)+9,1
+    elif alleles.count(0) == 1:
+        return (alleles.index(0)//2)+9,0
+    raise Exception("Allele count %d not singleton"%(alleles.count(1)))
+    #return alleles
+
+#def findSingleton(la):
+#   for i in range(9,len(la)):
+#        if '1' in la[i][0:3]:
+#            return i
+#    raise Exception("No singleton found")
 
 
 def parseChi(f1,f2):
@@ -41,21 +64,30 @@ def computeChi(f1,f2,mutrate):
         return float(phys)*mutrate
     return float(phys)*mutrate + gen
 
-def getStatString(current_left_la,current_right_la,geno):
-    if geno[0] != '0':
+def getStatString(current_left_la,current_right_la,geno,singleton_allele):
+    #if geno[0] = '0':
+    if int(geno[0]) == singleton_allele:
         physl,genl = parseChi(current_left_la[-2],current_right_la[-2])
         physr,genr = parseChi(current_left_la[-1],current_right_la[-1])
+        idx1 = -2
+        idx2 = -1
     else:
         physr,genr = parseChi(current_left_la[-2],current_right_la[-2])
         physl,genl = parseChi(current_left_la[-1],current_right_la[-1])
+        idx1 = -1
+        idx2 = -2
+    raw_vals = current_left_la[idx1]+'\t'+current_right_la[idx1]+'\t'+current_left_la[idx2]+'\t'+current_right_la[idx2]
     if genl is None:
-        return str(physl)+'\t'+str(physr)
-    return str(physl)+'\t'+str(physr)+'\t'+str(genl)+'\t'+str(genr)
+        return str(physl)+'\t'+str(physr)+'\t'+raw_vals
+    return str(physl)+'\t'+str(physr)+'\t'+str(genl)+'\t'+str(genr)+'\t'+raw_vals
 
-def phaseSingleton(orig_geno,current_left_la,current_right_la,mutrate):
+def phaseSingleton(orig_geno,current_left_la,current_right_la,mutrate,singleton_allele):
+    ga = '0|1' if singleton_allele == 1 else '1|0'
+    gb = '1|0' if singleton_allele == 1 else '0|1'
     chi_1 = computeChi(current_left_la[-2],current_right_la[-2],mutrate)
     chi_2 = computeChi(current_left_la[-1],current_right_la[-1],mutrate)
-    new_geno = ('0|1' if chi_1 > chi_2 else '1|0')
+    #new_geno = ('0|1' if chi_1 > chi_2 else '1|0')
+    new_geno = (ga if chi_1 > chi_2 else gb)
     #new_geno = ('0|1' if chi_1 < chi_2 else '1|0')
     return new_geno, (new_geno[0] == orig_geno[0])
 
@@ -104,15 +136,15 @@ def phase_with_lengths(sysargs):
         if pos != current_pos:
             sys.stdout.write(line)
             continue
-        singleton_idx = findSingleton(la)
+        singleton_idx,singleton_allele = findSingleton(la)
         for i in range(len(la)):
             if i != singleton_idx:
                 sys.stdout.write(la[i])
             else:
-                new_geno, changed = phaseSingleton(la[i],current_left_la,current_right_la,args.mutrate)
+                new_geno, changed = phaseSingleton(la[i],current_left_la,current_right_la,args.mutrate,singleton_allele)
                 sys.stdout.write(new_geno)
                 if args.statfile is not None:
-                    statf.write(la[1]+'\t'+str(singleton_idx)+'\t'+getStatString(current_left_la,current_right_la,la[i])+'\n')
+                    statf.write(la[1]+'\t'+str(singleton_idx)+'\t'+getStatString(current_left_la,current_right_la,la[i],singleton_allele)+'\n')
             if i != len(la)-1:
                 sys.stdout.write('\t')
             else:

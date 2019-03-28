@@ -49,6 +49,9 @@ def createParser():
     parser.add_argument("--include-singletons",dest="inc_sing",action="store_true")
     parser.add_argument("--lengths-only",dest="lengths_only",action="store_true",help="If set, will stop after generating lengths")
     parser.add_argument("--pypy",dest="use_pypy",action="store_true",help="If set, use pypy to accelerate length generation")
+    parser.add_argument("--k-all",dest="k_all",action="store_true",help=("Will provide outgroup MSH for all variants"))
+    parser.add_argument("--k-range",dest="k_range",type=int,nargs=2,help=("Provide outgroup MSH for inclusive range of k"))
+    parser.add_argument("--expmode",dest="expmode",action="store_true",help=("Use composite model in estimator"))
     subgroup = parser.add_mutually_exclusive_group()
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     subgroup.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
@@ -90,6 +93,10 @@ def splitArgsForEstimator(args):
         arglist.append('--nosquish')
     if args.posname is not None:
         arglist.append('--pos')
+    if args.k_all or args.k_range is not None:
+        arglist.append("--decmode")
+    if args.expmode:
+        arglist.append("--expmode")
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -130,6 +137,12 @@ def splitArgsForLengths(args,rvcfname):
     if args.inc_sing:
         msh_left_args.append('--include-singletons')
         msh_right_args.append('--include-singletons')
+    if args.k_all:
+        msh_left_args.append('--k-all')
+        msh_right_args.append('--k-all')
+    if args.k_range is not None:
+        msh_left_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
+        msh_right_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
     if args.random_n != -1:
         totaln = getN(args,skipsub = True)
         if args.random_n > totaln:
@@ -178,6 +191,8 @@ def main(argv):
         rvcfname = args.revname
     else:
         rvcfname = vcftag+"_reversed.vcf"
+        if vcfname[-6:] == 'vcf.gz':
+            rvcfname += ".gz"
     usepypyformsh = args.use_pypy
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
