@@ -4,12 +4,12 @@ Compute tc/alpha values for SNPs in a given VCF file. There are three components
 file,generating the lengths of the most shared haplotypes using the Burrows-Wheeler transform, and using those lengths to 
 estimate tc. As of now, there is no installer for this package, so usage is simply: 
 ```
-python path/to/files/runtc_real.py [options]
+python path/to/scripts/runtc_real.py [options]
 ```
 If --pypy is to be used for faster length calculation, the scripts must all be in the directory from which the runtc_real 
 script is called.
 
-The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will 
+The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will filter out any non-biallelic sites, indels, and sites with missing data, then
 generate tc estimates for every singleton in a VCF file, while not counting singletons toward the termination of MSH tracts. 
 Both haplotypes from an individual with the singleton at a site will have tc estimated, with the larger estimate returned as
 the chosen one. The output file has two columns: physical position and estimate. 
