@@ -21,6 +21,12 @@ the chosen one. The output file has two columns: physical position and estimate.
 
 --rec: Recombination rate per base pair (default 1e-8)
 
+--exp-model [growth rate]: Use estimator with exponential population growth model, providing value for growth rate
+per generation
+
+--twophase-model [growth_rate] [growth_start]: Use estimator with a constant population size followed by an exponential 
+phase growing at (growth_rate) starting (growth_start) generations ago.
+
 ### Analysis Options
 
 --alpha: Instead of only generating tc estimates for singletons, will identify MSH for every haplotype at all sites and 
