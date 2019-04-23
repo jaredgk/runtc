@@ -20,17 +20,21 @@ def createParser():
     parser.add_argument("--nocache",dest="cache",action="store_false")
     parser.add_argument("--bin",dest="bin",action="store_true")
     parser.add_argument("--round",dest="round",type=int,default=-1)
-    parser.add_argument("--mod-gen",dest="mod_gen",action="store_true")
     parser.add_argument("--full-output",dest="full_out",action="store_true")
     parser.add_argument("--snp-mode",dest="snp_mode",action="store_true",default = False)
-    parser.add_argument("--side-check",dest="side_check",action="store_true")
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
     parser.add_argument("--gen",dest="genname",type=str)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--pos",dest="pos",action="store_true")
     parser.add_argument("--decmode",dest="decmode",action="store_true")
-    parser.add_argument("--expmode",dest="expmode",action="store_true")
+    modelgroup = parser.add_mutually_exclusive_group()
+    modelgroup.add_argument("--exp-model",dest="expmodel",type=float,help=("Use "
+                            "exponential population model with given growth rate"))
+    modelgroup.add_argument("--twophase-model",dest="twophase",nargs=2,type=float,
+                            help=("Use two-phase (constant pop size then exp "
+                            "growth) model, with growth rate as first argument "
+                            "and growth time in generations as second"))
     return parser
 
 def genFunction(val):
@@ -44,7 +48,6 @@ def intw(v):
     return int(v)
 
 def floatw(v):
-    #sys.stderr.write('d\t'+str(v)+'\t'+str(float(v))+'\n')
     if v is None or '*' in v:
         return None
     if v == '-2':
@@ -75,7 +78,7 @@ def getl(f):
     except AttributeError:
         return l
 
-def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False,forceleftnone=None,forcerightnone=None):
+def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,forceleftnone=None,forcerightnone=None):
     d = None
     l1 = (la1[idx] if la1 is not None else ('0*:0*' if gen_flag else '0*'))
     l2 = (la2[idx] if la2 is not None else ('0*:0*' if gen_flag else '0*'))
@@ -90,9 +93,6 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False
         d2,df2 = intEndCheck(l2)
         m1 = None
         m2 = None
-        #m1 = (d1*rec if d1 is not None else None)
-        #m2 = (d2*rec if d2 is not None else None)
-    #if d1 is None and d2 is None:
     if df1 and df2:
         return d
     if length_offset > 0:
@@ -110,10 +110,6 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,mod_gen=False
             if gen_flag:
                 gen2 = float(la2[1])
                 m2 += abs(prg-gen2)
-    if mod_gen and m1 is not None:
-        m1 = genFunction(m1)
-    if mod_gen and m2 is not None:
-        m2 = genFunction(m2)
     if forceleftnone:
         d1 = m1 = None
     if forcerightnone:
@@ -181,29 +177,15 @@ def geomean(l):
 
 def fullStr(d):
     return str(d.dis1)+':'+str(d.dis2)+':'+str(d.chi)+':'+str(d.side)+':'+str(d.singlex)
-    #left_side = ''
-    #if d.side != 2:
-    #    left_side = str(d.dis1)+','+str(d.morgans1)
-    #else:
-    #    left_side = '-1,-1'
-    #if d.side != 1:
-    #    right_side = str(d.dis2)+','+str(d.morgans2)
-    #else:
-    #    right_side = '-1,-1'
-    #return left_side+','+right_side+','+str(d.chi)+','+str(dl.tcest)
 
 def run_estimator(args):
     parser = createParser()
     args = parser.parse_args(args)
-    #fnl = str(sys.argv[1])
     if args.left_file[-3:] == '.gz':
         fl = gzip.open(args.left_file,'r')
     else:
         fl = open(args.left_file,'r')
 
-
-
-    #fnr = str(sys.argv[2])
     if args.right_file[-3:] == '.gz':
         fr = gzip.open(args.right_file,'r')
     else:
@@ -224,12 +206,8 @@ def run_estimator(args):
 
 
     snp_mode = args.snp_mode
-
-
     start_idx = args.start
     end_idx = args.end
-
-
 
     mu = args.mut_rate
     rec = args.rec_rate
@@ -267,17 +245,13 @@ def run_estimator(args):
     if has_genetic_positions:
         prev_right_gen = float(la2[1])
 
-    #if args.singleton:
-    #    la1 = getl(fl).strip().split()
 
-    if args.side_check:
-        idx_list = getActiveIdx(la2,start_inds)
-    model_type="constant"
-    if args.expmode:
-        mc = fitmodel(n=n_model,N0=n0_model,popmodel="twophase",te=129.5,nosnp=args.alpha,g=0.01)
+    if args.expmodel is not None:
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="expgrowth",nosnp=args.alpha,g=args.expmodel)
+    elif args.twophase is not None:
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="twophase",nosnp=args.alpha,g=args.twophase[0],te=args.twophase[1])
     else:
-        mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
-
+         mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
 
@@ -330,27 +304,19 @@ def run_estimator(args):
             else:
                 rec_phys_pos = cur_right_pos
             recperbp = getGenRate(rec_phys_pos,g1,g2)
-            #recperbp = (cur_right_gen-prev_right_gen)/float(cur_right_pos-prev_right_pos)
         else:
             recperbp = rec
-##        if region_mode:
-##            if position_mode:
-##                outf.write(str(pos_list[pos_idx]))
-##            else:
-##                outf.write(str(prev_right_pos)+'-'+str(cur_right_pos))
-##        else:
-##            outf.write(str(prev_right_pos))
         out_pos = 0
 
-        hasleftmissing = (la1 == None or (args.side_check and hasmissing(la1,idx_list)))
-        hasrightmissing = (la2 == None or (args.side_check and hasmissing(la2,idx_list)))
+        hasleftmissing = (la1 == None)
+        hasrightmissing = (la2 == None)
         est_str = ''
         #if args.nosnp:
         dl1.clear()
         if not args.decmode:
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
-                            prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
+                            prev_right_pos,prev_right_gen,length_offset,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
                 if d is not None:
                     dl1.append(d)
             if len(dl1) != 0:
@@ -364,9 +330,9 @@ def run_estimator(args):
                     est_all_ml = geomean(est_list_ml)
                 else:
                     est_all_ml = max(est_list_ml)
-                est_str += ("\t%.4g"%recperbp)
-                est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
-                est_str += ('\t'+str(est_all_ml)+'\n')
+                #est_str += ("\t%.4g"%recperbp)
+                #est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
+                est_str += (str(est_all_ml)+'\n')
                 if length_offset > 0:
                     outf.write(str(prev_right_pos)+'\t'+est_str)
                 else:
@@ -378,8 +344,7 @@ def run_estimator(args):
             input_length = len(la2)
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
-                            prev_right_pos,prev_right_gen,length_offset,mod_gen=args.mod_gen,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
-                #outf.write(str(cur_right_pos)+'\t'+fullStr(d)+'\n')
+                            prev_right_pos,prev_right_gen,length_offset,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
                 if d is not None:
                     dl1.append(d)
             if len(dl1) != 0:

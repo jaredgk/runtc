@@ -8,21 +8,21 @@ import gc
 
 def createParser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--gen",dest="genname")
-    parser.add_argument("--vcf",dest="vcfname")
-    parser.add_argument("--sub",dest="subname")
-    parser.add_argument("--out",dest="outname")
-    parser.add_argument("--gen-idx",dest="genidx",type=int,default=0)
-    parser.add_argument("--nosquish",dest="squish",action="store_false")
-    parser.add_argument("--round",dest="round",type=int,default=-1)
-    parser.add_argument("--singleton",dest="singleton",action="store_true")
-    parser.add_argument("--positions",dest="posname",type=str)
-    parser.add_argument("--include-singletons",dest="inc_sing",action="store_true")
-    parser.add_argument("--revpos",dest="revpos",action="store_true")
+    parser.add_argument("--vcf",dest="vcfname",help="Input VCF filename, either uncompressed or gzipped")
+    parser.add_argument("--gen",dest="genname",help="Name of map file")
+    parser.add_argument("--sub",dest="subname",help="Name of file with subsample indices")
+    parser.add_argument("--out",dest="outname",help="Name of output lengths file")
+    parser.add_argument("--gen-idx",dest="genidx",type=int,default=0,help="Use [i+2]th column of genetic map file for genetic distances")
+    parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all rows in map file, not just rows with differing genetic distances")
+    parser.add_argument("--round",dest="round",type=int,default=-1,help="Round floats to this many significant figures")
+    parser.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two lengths, one for each haplotype of an individual with a singleton")
+    parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alpha estimates")
+    parser.add_argument("--include-singletons",dest="inc_sing",action="store_true",help="Allow singletons to terminate MSH lengths")
+    parser.add_argument("--revpos",dest="revpos",action="store_true",help="If using --positions, indicate this is for right length generation and input VCF is reversed")
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
-    parser.add_argument("--k-all",dest="k_all",action="store_true")
-    parser.add_argument("--k-range",dest="k_range",nargs=2,type=int)
+    parser.add_argument("--k-all",dest="k_all",action="store_true",help="Return outgroup lengths for every variant")
+    parser.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return outgroup lengths for every variant with allele count in given range")
     return parser
 
 def splitAllelesAll(la):
@@ -32,7 +32,6 @@ def splitAllelesAll(la):
     for i in range(9,len(la)):
         laa = la[i].split(':')[0]
         gts = laa.replace('|','/').split('/')
-        #sc = len(laa.replace('|','/').split('/'))
         for j in range(len(gts)):
             try:
                 g1 = int(gts[j])
@@ -80,9 +79,6 @@ def splitAllelesSub(la,idx_list):
         except ValueError:
             return []
         alleles.append(geno)
-
-    #if ac == 1 or ac == an - 1:
-    #    return []
     return alleles
 
 def splitAlleles(la,idx_list=None):
@@ -153,20 +149,15 @@ def reconstructDVector(d,idx):
         d_prime[i] = max(d[idx+1:i+1])
     return d_prime
 
-def setInvertA(a,idx_list):
-    a_set = []
-    for idx in idx_list:
-        a_set.append(a.index(idx))
-    return a_set
 
 def printAD(a,d,idx,idx_list):
     d_prime = reconstructDVector(d,idx)
     sys.stdout.write('\t'.join(map(str,idx_list))+'\n')
-    #sys.stdout.write('\t'.join(map(str,d_prime))+'\n')
-    #sys.stdout.write('\t'.join(map(str,d))+'\n')
-    #sys.stdout.write('\t'.join(map(str,a))+'\n')
+    sys.stdout.write('\t'.join(map(str,d_prime))+'\n')
+    sys.stdout.write('\t'.join(map(str,d))+'\n')
+    sys.stdout.write('\t'.join(map(str,a))+'\n')
     a_prime = [(aa in idx_list) for aa in a]
-    #sys.stdout.write('\t'.join(map(str,a_prime))+'\n')
+    sys.stdout.write('\t'.join(map(str,a_prime))+'\n')
     for i,rec in enumerate(zip(map(str,d),map(str,d_prime),map(str,a),map(str,a_prime))):
         sys.stdout.write(str(i)+'\t' +'\t'.join(rec)+'\n')
 
@@ -180,7 +171,6 @@ def getDKton(a,d,idx,sample_count,idx_list):
     a_idx = a.index(idx)
     hi_valid = False
     low_valid = False
-    #printAD(a,d,idx,idx_list)
     if a_idx != 0:
         d_low = d[a_idx]
         low_valid = True
@@ -188,39 +178,29 @@ def getDKton(a,d,idx,sample_count,idx_list):
         d_hi = d[a_idx+1]
         hi_valid = True
     i = a_idx-1
-    #while i >= 0 and a[i] in idx_list:
     if a_idx > 0 and a[a_idx-1] in idx_list:
         low_valid = False
         while i >= 1:
-            #sys.stdout.write("low "+str(i)+'\n')
             d_low = max(d_low,d[i])
             if a[i-1] not in idx_list:
                 low_valid = True
                 break
             i -= 1
     i = a_idx+2
-    #i = idx+1
-    #while i < sample_count and d_low < d_hi and a[i] in idx_list:
     if a_idx < sample_count-1 and a[a_idx+1] in idx_list:
         hi_valid = False
         while i < sample_count:
-            #sys.stdout.write("high "+str(i)+'\n')
             d_hi = max(d_hi,d[i])
             if a[i] not in idx_list:
                 hi_valid = True
                 break
             i += 1
-    #sys.stdout.write(str(low_valid)+'\t'+str(hi_valid)+'\n')
-    #sys.stdout.write(str(d_low)+'\t'+str(d_hi)+'\n')
-    #if a_idx == len(a)-1:
     if not hi_valid:
         return d_low
-    #if a_idx == 0:
     if not low_valid:
         return d_hi
     return min(d_hi,d_low)
 
-#def findOutgroupHap(a,d,hap_idx,idx_list)
 
 
 def roundSig(f,n):
@@ -264,9 +244,6 @@ def getGenMap(f,idx=0,squish=False):
                 a,b = parseGenLine([la[0],la[2]],idx)
             else:
                 a,b = parseGenLine(la,idx)
-
-        #if b != 0:
-        #For future: Use last position with 0.0 cm instead of first
         if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
             l1.append(a)
             l2.append(b)
@@ -338,14 +315,10 @@ def getKIdxList(alleles,k):
 
 def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_list=None):
     out_string = ''
-    #msh_vec = msh(a,d,pos_list,pos,sample_count)
     gen_flag = (gen_list is not None)
-    #if gen_flag:
-    #    g_vec = msh(a,d,gen_list,gpos,sample_count)
     out_string += str(pos)
     if gen_flag:
         out_string += '\t'+str(roundSig(gpos,args.round))
-    #if idx_list is None:
     for i in out_range:
         if idx_list is None:
             d_idx = getDSingle(a,d,i,sample_count)
@@ -365,7 +338,6 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
                 gen_len = str(abs(roundSig(gpos-gen_list[0],args.round)))+'*'
             else:
                 gen_len = str(abs(roundSig(gpos-gen_list[d_idx-1],args.round)))
-            #gen_len = abs(gen-gen_list[d_idx])
             out_string += ':'+gen_len
     out_string += '\n'
     return out_string
@@ -462,9 +434,6 @@ def getmsh(args):
             if not args.singleton:
                 if not args.inc_sing:
                     continue
-                #else:
-                #    singleton_idx = getSingletonIdx(alleles)
-            #else:
             elif (not args.k_all and args.k_range is None):
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
@@ -490,12 +459,7 @@ def getmsh(args):
             sample_count = len(alleles)
             a_prev = [i for i in range(sample_count)]
             d_prev = [0 for i in range(sample_count)]
-            #msh_vec = [-2 for ii in range(sample_count)]
-            #if gen_flag:
-            #    g_vec = [-2.0 for ii in range(sample_count)]
         if pos_flag:
-            #if outpos_list[outpos_idx] <= int(la[1]):
-            #while outpos_idx < len(outpos_list) and outpos_list[outpos_idx] <= int(la[1]):
             while positionCondition(outpos_list,outpos_idx,int(la[1]),args.revpos):
                 opos = outpos_list[outpos_idx]
                 out_range = range(sample_count)
@@ -507,7 +471,6 @@ def getmsh(args):
                 outpos_idx += 1
             if outpos_idx == len(outpos_list):
                 break
-        #if args.singleton and args.inc_sing and noninf_pos is not None:
         if (args.singleton and noninf_pos is not None):
             #Singleton mode, singletons included in cutoffs
             #Current snp is singleton
@@ -529,46 +492,12 @@ def getmsh(args):
             a_prev = a
             d_prev = d
             snp_count += 1
-        #if args.singleton and not args.inc_sing and noninf_pos is not None:
-            #Singleton mode, no singletons in cutoff, but site is singleton
-            #
-        #    out_range = [singleton_idx,singleton_idx+1]
-        #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count)
-        #    writeToFile(outf,out_string,compress_out)
-            #pos = noninf_pos
         if not args.singleton and not pos_flag and k is None:
             #Standard alpha use
             out_range = range(sample_count)
             gpos = (None if gen_list is None else gen_list[-1])
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
-        #if args.singleton and args.inc_sing:
-        #    out_range = []
-        #if not args.singleton or noninf_pos is not None:
-        #    if args.singleton:
-        #        out_range = [singleton_idx,singleton_idx+1]
-        #    else:
-        #        out_range = range(sample_count)
-        #    if noninf_pos is not None:
-        #        pos = noninf_pos
-        #        if gen_flag:
-        #            gpos = noninf_gen
-        #    else:
-        #        pos = pos_list[-1]
-        #        if gen_flag:
-        #            gpos = gen_list[-1]
-        #    msh_vec = msh(a,d,pos_list,pos)
-        #    if gen_flag:
-        #        g_vec = msh(a,d,gen_list,gpos)
-        #    writeToFile(outf,str(pos),compress_out)
-        #    if gen_flag:
-        #        genpos = float(getGenPos(pos,l1,l2))
-        #     writeToFile(outf,'\t'+str(roundSig(genpos,args.round)),compress_out)
-        #    for i in out_range:
-        #        writeToFile(outf,'\t'+str(msh_vec[i]),compress_out)
-        #        if gen_flag:
-        #            writeToFile(outf,':'+str(roundSig(g_vec[i],args.round)),compress_out)
-        #    writeToFile(outf,'\n',compress_out)
 
 
     outf.close()
