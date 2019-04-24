@@ -12,14 +12,14 @@ import datetime
 #    from msh_est import reverse_file,getmsh,run_estimator
 #except:
 #    sys.stderr.write("msh_est not found, using local files\n")
+
 from msh_from_vcf import getmsh
 from reversefile import reverse_file
 from aae_work import run_estimator
 
 PYPY_VERSION="pypy3"
 
-usepypyformsh = False
-#usepypyformsh = True
+
 
 def createParser():
     parser = argparse.ArgumentParser()
@@ -178,6 +178,15 @@ def getN(args, skipsub = False):
             n += sc
         return n
 
+def runWithPypy(pypy_version, script_name, args):
+    exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),script_name)
+    sub_string = pypy_version+' '+exec_path+' '+' '.join(map(str,args)) 
+    subprocess_return = subprocess.run(sub_string,shell=True)
+    if subprocess_return.returncode != 0:
+        sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')
+    return subprocess_return.returncode
+
+
 
 def main(argv):
     parser = createParser()
@@ -193,49 +202,38 @@ def main(argv):
         rvcfname = vcftag+"_reversed.vcf"
         if vcfname[-6:] == 'vcf.gz':
             rvcfname += ".gz"
-    usepypyformsh = args.use_pypy
+    usepypy = args.use_pypy
 
     if (args.force_override or not isfile(rvcfname)) and args.revname is None:
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
-        temp_pypy_str = "\"from reversefile import reverse_file; reverse_file('%s','%s')\" "%(vcfname,rvcfname)
-        temp_subprocess_return = subprocess.run("""%s -c %s"""%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if temp_subprocess_return.returncode != 0:
-            sys.stderr.write("Running without pypy\n")
+        retcode = 1
+        if usepypy:
+            retcode = runWithPypy(PYPY_VERSION,'reversefile.py',[vcfname,rvcfname])
+        if retcode != 0:
             reverse_file(vcfname,rvcfname)
     #print ("VCF reversed: "+datetime.datetime.now())
     msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
     if args.force_override or not isfile(leftmshfname):
         sys.stderr.write("Creating left lengths: %s\n" %(str(msh_left_args)))
-        if usepypyformsh:
-            temp_args_str = '['
-            for a in msh_left_args:
-                temp_args_str += "\'%s\',"%a
-            temp_args_str = temp_args_str[:-1] + ']'  # replace ',' on end with ']'
-            temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
-            temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if usepypyformsh== False or temp_subprocess_return.returncode != 0:
-            sys.stderr.write("Running without pypy\n")
+        retcode = 1
+        if usepypy:
+            retcode = runWithPypy(PYPY_VERSION,'msh_from_vcf.py',msh_left_args)
+        if retcode != 0:
             getmsh(msh_left_args)
     #print ("Left Lengths: "+datetime.datetime.now())
     if args.force_override or (not isfile(rightreversedmshfname) and not isfile(rightmshfname)):
         sys.stderr.write("Creating right lengths: %s\n" % (str(msh_right_args)))
-        if usepypyformsh:
-            temp_args_str = "["
-            for a in msh_right_args:
-                temp_args_str += "\'%s\',"%a
-            temp_args_str = temp_args_str[:-1] + ']' # replace ',' on end with ']'
-            temp_pypy_str = "\"from msh_from_vcf import getmsh;  getmsh(%s)\""%temp_args_str
-            temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if usepypyformsh== False or temp_subprocess_return.returncode != 0:
-            sys.stderr.write("Running without pypy\n")
+        if usepypy:
+            retcode = runWithPypy(PYPY_VERSION,'msh_from_vcf.py',msh_right_args)
+        if retcode != 0:
             getmsh(msh_right_args)
 
     if args.force_override or not isfile(rightmshfname):
         sys.stderr.write("Reversing right lengths\n")
-        temp_pypy_str = "\"from reversefile import reverse_file;  reverse_file('%s','%s')\" "%(rightreversedmshfname,rightmshfname)
-        temp_subprocess_return = subprocess.run("""%s -c %s """%(PYPY_VERSION,temp_pypy_str),shell=True)
-        if temp_subprocess_return.returncode != 0:
-            sys.stderr.write("Running without pypy\n")
+        retcode = 1
+        if usepypy:
+            retcode = runWithPypy(PYPY_VERSION,'reversefile.py',[rightreversedmshfname,rightmshfname])
+        if retcode != 0:
             reverse_file(rightreversedmshfname,rightmshfname)
     #print ("Right lengths: "+datetime.datetime.now())
     if args.gzip_check and isfile(rightreversedmshfname):

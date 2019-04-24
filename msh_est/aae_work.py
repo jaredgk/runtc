@@ -1,10 +1,10 @@
 import sys
-from tc_estimator import data,datalist,fitmodel
 import numpy as np
 import gzip
 import argparse
 import math
 from msh_from_vcf import getGenMap
+from tc_estimator import data,datalist,fitmodel
 
 def createParser():
     parser = argparse.ArgumentParser()

@@ -96,6 +96,6 @@ if __name__ == "__main__":
     if len(sys.argv) == 3:
         fname = sys.argv[1]
         frevname = sys.argv[2]
-        reverse(fname,frevname,doprint = True)
+        reverse_file(fname,frevname)
     else:
         print("usage: python reversefile.py filename1  filname2\n  filename1 is the name of the file to be reversed\n  filename2 is the name of the reversed file")
