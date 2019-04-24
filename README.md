@@ -6,8 +6,6 @@ estimate tc. As of now, there is no installer for this package, so usage is simp
 ```
 python path/to/scripts/runtc_real.py [options]
 ```
-If --pypy is to be used for faster length calculation, the scripts must all be in the directory from which the runtc_real 
-script is called.
 
 The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will filter out any non-biallelic sites, indels, and sites with missing data, then
 generate tc estimates for every singleton in a VCF file, while not counting singletons toward the termination of MSH tracts. 
@@ -40,6 +38,8 @@ output the geometric mean of the tc estimates generated per site.
 
 ### Input options
 
+--pypy: Use Pypy for reversing files and calculating lengths. Defaults to pypy3. If any errors are encountered, will run in standard python mode. 
+
 --rev: Filename for reversed VCF file, if reversal is done outside of pipeline. This will prevent automatic generation of 
 reversed VCF file.
 
@@ -50,9 +50,9 @@ positions.
 
 ### Output options:
 
---outmsh: Prefix for MSH length files (defaults to name of input VCF stripped of .vcf extension)
+--outmsh: Prefix for MSH length files (defaults to name of input VCF stripped of .vcf extension).
 
---outest: Name for output estimates file (default is stdout)
+--outest: Name for output estimates file (default is stdout).
 
 --gzip: Will compress length files.
 
