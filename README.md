@@ -4,18 +4,30 @@ Compute tc/alpha values for SNPs in a given VCF file. There are three components
 file,generating the lengths of the most shared haplotypes using the Burrows-Wheeler transform, and using those lengths to 
 estimate tc. As of now, there is no installer for this package, so usage is simply: 
 ```
-python path/to/files/runtc_real.py [options]
+python path/to/scripts/runtc_real.py [options]
 ```
 If --pypy is to be used for faster length calculation, the scripts must all be in the directory from which the runtc_real 
 script is called.
 
-The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will 
+The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will filter out any non-biallelic sites, indels, and sites with missing data, then
 generate tc estimates for every singleton in a VCF file, while not counting singletons toward the termination of MSH tracts. 
 Both haplotypes from an individual with the singleton at a site will have tc estimated, with the larger estimate returned as
-the chosen one. The output file has two columns: physical position and estimate.
-The default estimator values are n0 (sample population size) = 1000, mutation rate = 1e-8, and recombination rate = 1e-8. 
-These options can be changed with --n0, --mut, and --rec, respectively. 
-Some options of interest:
+the chosen one. The output file has two columns: physical position and estimate. 
+
+### Model Options
+--n0: sample population size (default 1000)
+
+--mut: Mutation rate per base pair (default 1e-8)
+
+--rec: Recombination rate per base pair (default 1e-8)
+
+--exp-model [growth rate]: Use estimator with exponential population growth model, providing value for growth rate
+per generation
+
+--twophase-model [growth_rate] [growth_start]: Use estimator with a constant population size followed by an exponential 
+phase growing at (growth_rate) starting (growth_start) generations ago.
+
+### Analysis Options
 
 --alpha: Instead of only generating tc estimates for singletons, will identify MSH for every haplotype at all sites and 
 output the geometric mean of the tc estimates generated per site.
@@ -26,7 +38,7 @@ output the geometric mean of the tc estimates generated per site.
 
 --k-all: Same as --k-range, but will do for all sites.
 
-Input options:
+### Input options
 
 --rev: Filename for reversed VCF file, if reversal is done outside of pipeline. This will prevent automatic generation of 
 reversed VCF file.
@@ -36,7 +48,7 @@ positions.
 
 --reuse: If length/reversed VCF files are present for given output prefix, will not attempt to regenerate them.
 
-Output options:
+### Output options:
 
 --outmsh: Prefix for MSH length files (defaults to name of input VCF stripped of .vcf extension)
 
