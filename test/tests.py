@@ -28,6 +28,15 @@ class basicTest(unittest.TestCase):
         getmsh(args)
         self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ns.txt'))
 
+    def test_kall_withsgtn(self):
+        args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt','--include-singletons','--singleton']
+        getmsh(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_kall_ws.txt'))
+
+    def test_kall_nosgtn(self):
+        args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt','--singleton']
+        getmsh(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_kall_ns.txt'))
 
 #other tests: with genetic distances, estimator?
 
