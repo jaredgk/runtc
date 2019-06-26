@@ -47,6 +47,7 @@ def createParser():
     parser.add_argument("--k-range",dest="k_range",type=int,nargs=2,help=("Provide outgroup MSH for inclusive range of k"))
     parser.add_argument("--expmode",dest="expmode",action="store_true",help=("Use composite model in estimator"))
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
+    parser.add_argument("--output-all-est",dest="all_est",action="store_true",help=("Output all estimates instead of mean/max"))
     subgroup = parser.add_mutually_exclusive_group()
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     subgroup.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
@@ -96,6 +97,8 @@ def splitArgsForEstimator(args):
         arglist.extend(['--exp-model',str(args.expmodel)])
     if args.twophase is not None:
         arglist.extend(['--twophase-model',str(args.twophase[0]),str(args.twophase[1])])
+    if args.all_est:
+        arglist.append("--output-all-est")
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -126,13 +129,16 @@ def splitArgsForLengths(args,rvcfname):
     if args.round != -1:
         msh_left_args.extend(['--round',str(args.round)])
         msh_right_args.extend(['--round',str(args.round)])
-    if not args.alpha:
+    if not args.alpha and not args.k_all and args.k_range is None:
         msh_left_args.append('--singleton')
         msh_right_args.append('--singleton')
     if args.posname is not None:
         msh_left_args.extend(['--positions',str(args.posname)])
         msh_right_args.extend(['--positions',str(args.posname)])
         msh_right_args.extend(['--revpos'])
+    if args.all_est:
+        msh_left_args.append("--alpha-singleton-only")
+        msh_right_args.append("--alpha-singleton-only")
     if args.inc_sing:
         msh_left_args.append('--include-singletons')
         msh_right_args.append('--include-singletons')

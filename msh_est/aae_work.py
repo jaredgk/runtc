@@ -17,6 +17,8 @@ def createParser():
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
     parser.add_argument("--alpha",dest="alpha",action="store_true",default = False)
+    parser.add_argument("--output-all-est",dest="all_est",action="store_true",
+                        help=("Output all estimates instead of mean/max"))
     parser.add_argument("--nocache",dest="cache",action="store_false")
     parser.add_argument("--bin",dest="bin",action="store_true")
     parser.add_argument("--round",dest="round",type=int,default=-1)
@@ -326,13 +328,14 @@ def run_estimator(args):
                         chi_list.append(d.chi)
                 chi_geomean = geomean(chi_list)
                 est_list_ml= dl1.estimate_tc_cache(cache=args.cache,round=args.round,bin=args.bin)
-                if args.alpha:
-                    est_all_ml = geomean(est_list_ml)
+                if args.all_est:
+                    est_str = '\t'.join(map(str,est_list_ml))+'\n'
                 else:
-                    est_all_ml = max(est_list_ml)
-                #est_str += ("\t%.4g"%recperbp)
-                #est_str += ("\t%d\t%.4g"%(len(dl1),chi_geomean))
-                est_str += (str(est_all_ml)+'\n')
+                    if args.alpha:
+                        est_all_ml = geomean(est_list_ml)
+                    else:
+                        est_all_ml = max(est_list_ml)
+                    est_str = (str(est_all_ml)+'\n')
                 if length_offset > 0:
                     outf.write(str(prev_right_pos)+'\t'+est_str)
                 else:
@@ -347,12 +350,13 @@ def run_estimator(args):
                             prev_right_pos,prev_right_gen,length_offset,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
                 if d is not None:
                     dl1.append(d)
+            k_val = input_length - start_inds
             if len(dl1) != 0:
                 dl1.estimate_tc_kgt1()
-                est_str = (str(cur_right_pos)+'\t'+str(dl1.tcest)+'\n')
+                est_str = (str(cur_right_pos)+'\t'+str(dl1.tcest)+'\t'+str(k_val)+'\n')
                 outf.write(est_str)
             else:
-                outf.write(str(cur_right_pos)+'\t-1\n')
+                outf.write(str(cur_right_pos)+'\t-1\t'+str(k_val)+'\n')
 
         ii += 1
         prev_right_pos = cur_right_pos

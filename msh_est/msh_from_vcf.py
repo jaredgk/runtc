@@ -15,14 +15,16 @@ def createParser():
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0,help="Use [i+2]th column of genetic map file for genetic distances")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all rows in map file, not just rows with differing genetic distances")
     parser.add_argument("--round",dest="round",type=int,default=-1,help="Round floats to this many significant figures")
-    parser.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two lengths, one for each haplotype of an individual with a singleton")
+    runtype = parser.add_mutually_exclusive_group()
+    runtype.add_argument("--k-all",dest="k_all",action="store_true",help="Return outgroup lengths for every variant")
+    runtype.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return outgroup lengths for every variant with allele count in given range")
+    runtype.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two lengths, one for each haplotype of an individual with a singleton")
+    parser.add_argument("--alpha-singleton-only",dest="alpha_sing_only",action="store_true",help=("Output lengths for alpha estimator at singleton sites only"))
     parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alpha estimates")
     parser.add_argument("--include-singletons",dest="inc_sing",action="store_true",help="Allow singletons to terminate MSH lengths")
     parser.add_argument("--revpos",dest="revpos",action="store_true",help="If using --positions, indicate this is for right length generation and input VCF is reversed")
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
-    parser.add_argument("--k-all",dest="k_all",action="store_true",help="Return outgroup lengths for every variant")
-    parser.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return outgroup lengths for every variant with allele count in given range")
     return parser
 
 def splitAllelesAll(la):
@@ -135,6 +137,7 @@ def getDSingle(a,d,idx,sample_count):
     if a is None:
         return -1
     aidx = a.index(idx)
+    
     if aidx == sample_count - 1:
         return d[sample_count-1]
     elif aidx == 0:
@@ -150,16 +153,17 @@ def reconstructDVector(d,idx):
     return d_prime
 
 
-def printAD(a,d,idx,idx_list):
-    d_prime = reconstructDVector(d,idx)
-    sys.stdout.write('\t'.join(map(str,idx_list))+'\n')
-    sys.stdout.write('\t'.join(map(str,d_prime))+'\n')
+#def printAD(a,d,idx,idx_list):
+def printAD(a,d):
+    #d_prime = reconstructDVector(d,idx)
+    #sys.stdout.write('\t'.join(map(str,idx_list))+'\n')
+    #sys.stdout.write('\t'.join(map(str,d_prime))+'\n')
     sys.stdout.write('\t'.join(map(str,d))+'\n')
     sys.stdout.write('\t'.join(map(str,a))+'\n')
-    a_prime = [(aa in idx_list) for aa in a]
-    sys.stdout.write('\t'.join(map(str,a_prime))+'\n')
-    for i,rec in enumerate(zip(map(str,d),map(str,d_prime),map(str,a),map(str,a_prime))):
-        sys.stdout.write(str(i)+'\t' +'\t'.join(rec)+'\n')
+    #a_prime = [(aa in idx_list) for aa in a]
+    #sys.stdout.write('\t'.join(map(str,a_prime))+'\n')
+    #for i,rec in enumerate(zip(map(str,d),map(str,d_prime),map(str,a),map(str,a_prime))):
+    #    sys.stdout.write(str(i)+'\t' +'\t'.join(rec)+'\n')
 
 def getDKton(a,d,idx,sample_count,idx_list):
     if a is None:
@@ -247,6 +251,8 @@ def getGenMap(f,idx=0,squish=False):
         if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
             l1.append(a)
             l2.append(b)
+    sys.stderr.write('\t'.join(map(str,[l1[0],l2[0],l1[-1],l2[-1]]))+'\n')
+    sys.stderr.write(str(len(l1))+'\n')
     return l1,l2
 
 def getGenPos(pos,l1,l2,cm=True):
@@ -324,6 +330,9 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
             d_idx = getDSingle(a,d,i,sample_count)
         else:
             d_idx = getDKton(a,d,i,sample_count,idx_list)
+            #sys.stderr.write(str(a)+'\t'+str(d_idx)+'\n')
+        #out_string += '\t'+str(d_idx)+'\t'+str(aidx)
+        #sys.stderr.write(str(d_idx)+'\n')
         if d_idx == -1:
             pos_len = '0*'
         elif d_idx == 0:
@@ -331,6 +340,8 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
         else:
             pos_len = str(abs(pos-pos_list[d_idx-1]))
         out_string += '\t'+pos_len
+        aaa = (0 if a is None else a.index(i))
+        #out_string += '\t'+str(d_idx)+'\t'+str(aaa)
         if gen_flag:
             if d_idx == -1:
                 gen_len = '0.0*'
@@ -339,6 +350,7 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
             else:
                 gen_len = str(abs(roundSig(gpos-gen_list[d_idx-1],args.round)))
             out_string += ':'+gen_len
+    #exit()
     out_string += '\n'
     return out_string
 
@@ -382,7 +394,8 @@ def getmsh(args):
         vcf = gzip.open(args.vcfname,'r')
     else:
         vcf = open(args.vcfname,'r')
-    k = args.k_val
+    #k = args.k_val
+    k_mode = (args.k_all or args.k_range is not None)
 
 
     snp_count = 0
@@ -410,12 +423,8 @@ def getmsh(args):
         if line[0] == '#' or line[0] == '\n':
             continue
         la = line.strip().split()
-        try:
-            if 'CPG_TAG' in la[7]:
-                continue
-            lastline = la
-        except Exception:
-            pass
+        if 'CPG_TAG' in la[7]:
+            continue
         if len(la[3]) != 1 or len(la[4]) != 1:
             continue
         noninf_pos = None
@@ -431,19 +440,14 @@ def getmsh(args):
         if len(alleles) == 0 or ac == 0 or ac == len(alleles):
             continue
         if ac == 1 or ac == len(alleles)-1:
-            if not args.singleton:
+            if not args.singleton and not k_mode:
                 if not args.inc_sing:
                     continue
-            elif (not args.k_all and args.k_range is None):
+            elif not k_mode:
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
                 if gen_flag:
                     noninf_gen = float(getGenPos(noninf_pos,l1,l2))
-        if k is not None and (ac == k or ac == len(alleles) - k):
-            k_idxlist = getKIdxList(alleles,k)
-            k_pos = int(la[1])
-            if gen_flag:
-                k_gen = float(getGenPos(k_pos,l1,l2))
         if args.k_all:
             k_idxlist = getKIdxList(alleles,ac)
             k_pos = int(la[1])
@@ -492,8 +496,10 @@ def getmsh(args):
             a_prev = a
             d_prev = d
             snp_count += 1
-        if not args.singleton and not pos_flag and k is None:
+        if not args.singleton and not pos_flag and not k_mode:
             #Standard alpha use
+            if args.alpha_sing_only and ac != 1:
+                continue
             out_range = range(sample_count)
             gpos = (None if gen_list is None else gen_list[-1])
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
