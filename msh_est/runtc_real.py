@@ -48,6 +48,7 @@ def createParser():
     parser.add_argument("--expmode",dest="expmode",action="store_true",help=("Use composite model in estimator"))
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
     parser.add_argument("--output-all-est",dest="all_est",action="store_true",help=("Output all estimates instead of mean/max"))
+    parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int)
     subgroup = parser.add_mutually_exclusive_group()
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     subgroup.add_argument("--sub",dest="subname",type=str,help="file with list of chromosome numbers to use from vcf (0-based, e.g. individuals 0,3: 0,1,6,7")
@@ -148,6 +149,9 @@ def splitArgsForLengths(args,rvcfname):
     if args.k_range is not None:
         msh_left_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
         msh_right_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
+    if args.dt_exp is not None:
+        msh_left_args.extend(['--dt-exp',str(args.dt_exp[0]),str(args.dt_exp[1])])
+        msh_right_args.extend(['--dt-exp',str(args.dt_exp[0]),str(args.dt_exp[1])])
     if args.random_n != -1:
         totaln = getN(args,skipsub = True)
         if args.random_n > totaln:

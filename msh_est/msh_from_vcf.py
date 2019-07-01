@@ -25,6 +25,7 @@ def createParser():
     parser.add_argument("--revpos",dest="revpos",action="store_true",help="If using --positions, indicate this is for right length generation and input VCF is reversed")
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
+    parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int)
     return parser
 
 def splitAllelesAll(la):
@@ -436,6 +437,8 @@ def getmsh(args):
         if snp_count == 0 and sub_flag:
             idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
+        if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
+            alleles[args.dt_exp[1]] = 1
         ac = sum(alleles)
         if len(alleles) == 0 or ac == 0 or ac == len(alleles):
             continue
@@ -483,9 +486,13 @@ def getmsh(args):
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
         if k_idxlist is not None:
+            if args.dt_exp is not None and args.dt_exp[0] != int(la[1]):
+                continue
             out_range = k_idxlist
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
+            if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
+                break
         if not args.singleton or noninf_pos is None or args.inc_sing:
             #Only skips when in singleton mode when singleton is hit
             #and shouldn't affect a/d

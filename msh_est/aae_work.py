@@ -98,14 +98,16 @@ def makeData(la1,la2,idx,gen_flag,rec,mu,mod,prp,prg,length_offset,forceleftnone
     if df1 and df2:
         return d
     if length_offset > 0:
-        if d1 is not None:
+        #if d1 is not None:
+        if la1 is not None:
             pos1 = int(la1[0])
             inc1 = abs(prp-pos1)
             d1 += inc1
             if gen_flag:
                 gen1 = float(la1[1])
                 m1 += abs(prg-gen1)
-        if d2 is not None and (length_offset == 2 or d1 is None):
+        #if d2 is not None and (length_offset == 2 or d1 is None):
+        if la2 is not None and (length_offset == 2 or la1 is None):
             pos2 = int(la2[0])
             inc2 = abs(prp-pos2)
             d2 += inc2
