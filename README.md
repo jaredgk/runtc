@@ -10,10 +10,8 @@ Typically a vcf file should contain phased genotypes at all variable positions o
 
 If the file has not been phased at singleton sites,  then it should be first run through phase_singletons.py
 
-??missing data??
-?? multiallelic sites??
-??  non-snp sites??
-?? is '1' always assumed to be the derived allele?? 
+For this analysis, all sites with missing data, multiple derived alleles, or no variation will be ignored. 
+
 
 ## phase_singletons.py
 
