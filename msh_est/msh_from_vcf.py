@@ -1,3 +1,10 @@
+#-------------------------------------------------------------------------------
+# Name:        msh_from_vcf.py
+# Authors:     Jared Knoblauch, Alex Platt, Jody Hey
+# Created:     11/07/2019
+# Copyright:   (c) Jody Hey 2019
+#-------------------------------------------------------------------------------
+
 import sys
 import argparse
 import gzip
@@ -11,17 +18,17 @@ def createParser():
     parser.add_argument("--vcf",dest="vcfname",help="Input VCF filename, either uncompressed or gzipped")
     parser.add_argument("--gen",dest="genname",help="Name of map file")
     parser.add_argument("--sub",dest="subname",help="Name of file with subsample indices")
-    parser.add_argument("--out",dest="outname",help="Name of output lengths file")
+    parser.add_argument("--out",dest="outname",help="Name of output msh file")
     parser.add_argument("--gen-idx",dest="genidx",type=int,default=0,help="Use [i+2]th column of genetic map file for genetic distances")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all rows in map file, not just rows with differing genetic distances")
     parser.add_argument("--round",dest="round",type=int,default=-1,help="Round floats to this many significant figures")
     runtype = parser.add_mutually_exclusive_group()
-    runtype.add_argument("--k-all",dest="k_all",action="store_true",help="Return outgroup lengths for every variant")
-    runtype.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return outgroup lengths for every variant with allele count in given range")
-    runtype.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two lengths, one for each haplotype of an individual with a singleton")
-    parser.add_argument("--alpha-singleton-only",dest="alpha_sing_only",action="store_true",help=("Output lengths for alpha estimator at singleton sites only"))
-    parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alpha estimates")
-    parser.add_argument("--include-singletons",dest="inc_sing",action="store_true",help="Allow singletons to terminate MSH lengths")
+    runtype.add_argument("--k-all",dest="k_all",action="store_true",help="Return estimatesfor every variant")
+    runtype.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return estimates for every variant with allele count in given range")
+    runtype.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two msh values, one for each haplotype of an individual with a singleton")
+    parser.add_argument("--alledges-singleton-only",dest="alledges_sing_only",action="store_true",help=("Output lengths for alledges estimator at singleton sites only"))
+    parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alledges estimates")
+    parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_true",help="DO NOT Allow singletons to terminate MSH lengths") ## changed from --include-singletons JH 7/11/2019
     parser.add_argument("--revpos",dest="revpos",action="store_true",help="If using --positions, indicate this is for right length generation and input VCF is reversed")
     parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
                         "lengths for every k-ton"))
@@ -138,7 +145,7 @@ def getDSingle(a,d,idx,sample_count):
     if a is None:
         return -1
     aidx = a.index(idx)
-    
+
     if aidx == sample_count - 1:
         return d[sample_count-1]
     elif aidx == 0:
@@ -252,8 +259,8 @@ def getGenMap(f,idx=0,squish=False):
         if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
             l1.append(a)
             l2.append(b)
-    sys.stderr.write('\t'.join(map(str,[l1[0],l2[0],l1[-1],l2[-1]]))+'\n')
-    sys.stderr.write(str(len(l1))+'\n')
+##    sys.stderr.write('\t'.join(map(str,[l1[0],l2[0],l1[-1],l2[-1]]))+'\n')
+##    sys.stderr.write(str(len(l1))+'\n')
     return l1,l2
 
 def getGenPos(pos,l1,l2,cm=True):
@@ -444,14 +451,19 @@ def getmsh(args):
             continue
         if ac == 1 or ac == len(alleles)-1:
             if not args.singleton and not k_mode:
-                if not args.inc_sing:
+##                if not args.inc_sing:  ## not clear what this does
+                if args.exc_sing:  ## changed to this JH 7/11/2019
                     continue
             elif not k_mode:
                 noninf_pos = int(la[1])
                 singleton_idx = getSingletonIdx(alleles)
                 if gen_flag:
                     noninf_gen = float(getGenPos(noninf_pos,l1,l2))
-        if args.k_all:
+            if args.k_all and ac == 1 and args.exc_sing:
+                continue
+        do_k = args.k_all and ac != 1
+        #if args.k_all:
+        if do_k:
             k_idxlist = getKIdxList(alleles,ac)
             k_pos = int(la[1])
             if gen_flag:
@@ -493,7 +505,7 @@ def getmsh(args):
             writeToFile(outf,out_string,compress_out)
             if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
                 break
-        if not args.singleton or noninf_pos is None or args.inc_sing:
+        if not args.singleton or noninf_pos is None or not args.exc_sing:  ## changed from or args.inc_sing  JH 7/11/2019
             #Only skips when in singleton mode when singleton is hit
             #and shouldn't affect a/d
             pos_list.append(int(la[1]))
@@ -504,14 +516,13 @@ def getmsh(args):
             d_prev = d
             snp_count += 1
         if not args.singleton and not pos_flag and not k_mode:
-            #Standard alpha use
-            if args.alpha_sing_only and ac != 1:
+            #Standard alledges use
+            if args.alledges_sing_only and ac != 1:
                 continue
             out_range = range(sample_count)
             gpos = (None if gen_list is None else gen_list[-1])
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,pos_list[-1],gpos,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
-
 
     outf.close()
     return outfn

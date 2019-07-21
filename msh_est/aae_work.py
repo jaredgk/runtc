@@ -1,3 +1,9 @@
+#-------------------------------------------------------------------------------
+# Name:        aae_work.py
+# Authors:     Jared Knoblauch, Alex Platt, Jody Hey
+# Created:     11/07/2019
+# Copyright:   (c) Jody Hey 2019
+#-------------------------------------------------------------------------------
 import sys
 import numpy as np
 import gzip
@@ -16,7 +22,7 @@ def createParser():
     parser.add_argument("--n0",dest="n0_model",type=int,default=1000)
     parser.add_argument("--mut",dest="mut_rate",type=float,default=1e-8)
     parser.add_argument("--rec",dest="rec_rate",type=float,default=1e-8)
-    parser.add_argument("--alpha",dest="alpha",action="store_true",default = False)
+    parser.add_argument("--alledges",dest="alledges",action="store_true",default = False)
     parser.add_argument("--output-all-est",dest="all_est",action="store_true",
                         help=("Output all estimates instead of mean/max"))
     parser.add_argument("--nocache",dest="cache",action="store_false")
@@ -38,6 +44,7 @@ def createParser():
                             "growth) model, with growth rate as first argument "
                             "and growth time in generations as second"))
     return parser
+
 
 def genFunction(val):
     return float(1-math.exp(-2*val))/2
@@ -203,7 +210,7 @@ def run_estimator(args):
         position_mode = True
     map_for_rec = False
     if args.genname is not None:
-        print(args.genname)
+##        print(args.genname)
         genf = open(args.genname,'r')
         g1,g2 = getGenMap(genf,squish=args.squish)
         map_for_rec = True
@@ -219,14 +226,14 @@ def run_estimator(args):
     #n_model = args.n_model
     n0_model = args.n0_model
     #Means left and right lengths should line up
-    lengths_set = (not args.alpha or args.pos)
+    lengths_set = (not args.alledges or args.pos)
     length_offset = 0
-    if args.alpha and not args.pos:
+    if args.alledges and not args.pos:
         if args.snp_mode:
             length_offset = 2
         else:
             length_offset = 1
-    sys.stderr.write(str(length_offset)+'\n')
+##    sys.stderr.write(str(length_offset)+'\n')  jh 7/11/2019  stopped writing this,  though can be useful for debugging
     ii = 0
     has_genetic_positions = False
     right_done = False
@@ -251,11 +258,11 @@ def run_estimator(args):
 
 
     if args.expmodel is not None:
-        mc = fitmodel(n=n_model,N0=n0_model,popmodel="expgrowth",nosnp=args.alpha,g=args.expmodel)
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="expgrowth",nosnp=args.alledges,g=args.expmodel)
     elif args.twophase is not None:
-        mc = fitmodel(n=n_model,N0=n0_model,popmodel="twophase",nosnp=args.alpha,g=args.twophase[0],te=args.twophase[1])
+        mc = fitmodel(n=n_model,N0=n0_model,popmodel="twophase",nosnp=args.alledges,g=args.twophase[0],te=args.twophase[1])
     else:
-         mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alpha)
+         mc = fitmodel(n=n_model,N0=n0_model,popmodel="constant",nosnp = args.alledges)
     if args.bin:
         dl1.calc_tc_bins(1e-9,10,mu,mc)
 
@@ -278,7 +285,7 @@ def run_estimator(args):
             la1 = None
             cur_left_pos = prev_right_pos
         try:
-            #if args.alpha or ii != 0:
+            #if args.alledges or ii != 0:
             #if not lengths_set or ii != 0:
             if length_offset >= 1 or ii != 0:
                 l2 = getl(fr)
@@ -333,11 +340,13 @@ def run_estimator(args):
                 if args.all_est:
                     est_str = '\t'.join(map(str,est_list_ml))+'\n'
                 else:
-                    if args.alpha:
+                    if args.alledges:
                         est_all_ml = geomean(est_list_ml)
                     else:
                         est_all_ml = max(est_list_ml)
-                    est_str = (str(est_all_ml)+'\n')
+                    est_str =  "{:.3f}\n".format(est_all_ml)
+##                    est_str = (str(est_all_ml)+'\n')
+
                 if length_offset > 0:
                     outf.write(str(prev_right_pos)+'\t'+est_str)
                 else:
@@ -355,19 +364,20 @@ def run_estimator(args):
             k_val = input_length - start_inds
             if len(dl1) != 0:
                 dl1.estimate_tc_kgt1()
-                est_str = (str(cur_right_pos)+'\t'+str(dl1.tcest)+'\t'+str(k_val)+'\n')
+                est_str = (str(cur_right_pos)+'\t'+ "{:.3f}".format(dl1.tcest)+'\t'+str(k_val)+'\n')
+##                est_str = (str(cur_right_pos)+'\t'+ str(dl1.tcest)+'\t'+str(k_val)+'\n')
                 outf.write(est_str)
             else:
                 outf.write(str(cur_right_pos)+'\t-1\t'+str(k_val)+'\n')
-
         ii += 1
         prev_right_pos = cur_right_pos
         if has_genetic_positions:
             prev_right_gen = cur_right_gen
         if right_done:
             break
-    if args.cache and args.alpha and not args.decmode:
-        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
+##    jh 7/11/2019  stopped writing this,  though can be useful in development/debugging
+##    if args.cache and args.alledges and not args.decmode:
+##        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":
     run_estimator(sys.argv[1:])

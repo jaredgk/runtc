@@ -1,14 +1,24 @@
+#-------------------------------------------------------------------------------
+# Name:        phase_singletons.py
+# Authors:     Jared Knoblauch, Alex Platt, Jody Hey
+# Created:     11/07/2019
+# Copyright:   (c) Jody Hey 2019
+#-------------------------------------------------------------------------------
 import sys
 import argparse
 import gzip
+from os.path import isfile
+import os
+import runtc
+
 
 def createParser():
     parser = argparse.ArgumentParser()
-    parser.add_argument("vcfname")
-    parser.add_argument("left_lengths")
-    parser.add_argument("right_lengths")
-    parser.add_argument("--mutrate",dest="mutrate",type=float,default=1e-8)
-    parser.add_argument("--statfile",dest="statfile",type=str)
+    parser.add_argument("vcfname",type=str,help="vcf or vcf.gz input file")
+##    parser.add_argument("--mutrate",dest="mutrate",type=float,default=1e-8)  not needed
+    parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="gzip temporary msh files")
+    parser.add_argument("--statfile",dest="statfile",type=str,help=argparse.SUPPRESS)
+    parser.add_argument("--keep",dest='keepfiles',action="store_true",help="save temporary msh and reversed vcf files")
     return parser
 
 def findSingleton(la):
@@ -95,6 +105,46 @@ def phaseSingleton(orig_geno,current_left_la,current_right_la,mutrate,singleton_
 def phase_with_lengths(sysargs):
     parser = createParser()
     args = parser.parse_args(sysargs)
+    vcfname = args.vcfname
+    vcftag = vcfname[0:vcfname.rfind(".vcf")]
+    rvcfname = vcftag+"_reversed.vcf"
+    if vcfname[-6:] == 'vcf.gz':
+        rvcfname += ".gz"
+
+    ## set options for runtc.makemshfiles()
+    args.outmsh = vcftag + "_singleton_phasing"
+    args.revname = rvcfname
+    args.lengths_only = True
+    args.exc_sing = True
+##    args.revname = None
+    args.no_pypy = False
+    args.force_overwrite = True
+    args.rec_rate = 1e-8
+    args.mut_rate = 0.0  ## mutation does not matter for phasing singletons
+    args.mapname = None
+    args.subname = None
+    args.squish = True
+    args.round = 3
+    args.all_est  = False
+    args.posname = None
+    args.k_all = None
+    args.k_range = None
+    args.dt_exp  = None
+    args.random_n = -1
+    args.alledges = False
+    args.n0_model = 10000
+    args.cache = None
+    args.bin = None
+    args.outfn = None
+    args.snp_mode = None
+    args.expmode = None
+    args.expmodel = None
+    args.twophase = None
+
+
+    runtcestargs = runtc.makemshfiles(args)
+    args.left_lengths = runtcestargs[0]
+    args.right_lengths = runtcestargs[1]
     if args.vcfname[-3:] == '.gz':
         vcf = gzip.open(args.vcfname,'r')
     else:
@@ -141,7 +191,7 @@ def phase_with_lengths(sysargs):
             if i != singleton_idx:
                 sys.stdout.write(la[i])
             else:
-                new_geno, changed = phaseSingleton(la[i],current_left_la,current_right_la,args.mutrate,singleton_allele)
+                new_geno, changed = phaseSingleton(la[i],current_left_la,current_right_la,args.mut_rate,singleton_allele)
                 sys.stdout.write(new_geno)
                 if args.statfile is not None:
                     statf.write(la[1]+'\t'+str(singleton_idx)+'\t'+getStatString(current_left_la,current_right_la,la[i],singleton_allele)+'\n')
@@ -165,9 +215,18 @@ def phase_with_lengths(sysargs):
         except IndexError:
             current_pos = 0
             continue
-
+    if not args.keepfiles:
+        left_f.close()
+        right_f.close()
+        if isfile(runtcestargs[0]):
+            os.remove(runtcestargs[0])
+        if isfile(runtcestargs[1]):
+            os.remove(runtcestargs[1])
+        if isfile(args.revname):
+            os.remove(args.revname)
+    return
 
 if __name__ == '__main__':
     phase_with_lengths(sys.argv[1:])
-        
-    
+
+

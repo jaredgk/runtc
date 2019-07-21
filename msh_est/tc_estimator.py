@@ -1,3 +1,10 @@
+#-------------------------------------------------------------------------------
+# Name:        tc_estimator.py
+# Authors:     Jared Knoblauch, Alex Platt, Jody Hey
+# Created:     11/07/2019
+# Copyright:   (c) Jody Hey 2019
+#-------------------------------------------------------------------------------
+
 """
     tc_estimator.py  - copyright Jody Hey 2018
     trimmed down version of AlleleAgeEstimator.py
@@ -597,7 +604,7 @@ class datalist(list):
                     if bin
                         get bin value
                     else
-                        calcualte value
+                        calculate value
                 put value in cache
             else
                 if bin
@@ -648,6 +655,10 @@ class datalist(list):
         return tclist
 
     def calc_tc_bins(self,start,stop,mu,model,num=10000):
+        """
+            generates num chi values and estimates for each
+            used to replace calculations with lookups
+        """
         self.bins = list(np.geomspace(start,stop,num))
         self.bins_single = list(np.geomspace(start,stop,num))
         #fo = open('bin_vals.txt','w')
