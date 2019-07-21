@@ -1,70 +1,129 @@
-# msh-python
+# RUNTC
 
-Compute tc/alpha values for SNPs in a given VCF file. There are three components to this process: reversing the original VCF 
-file,generating the lengths of the most shared haplotypes using the Burrows-Wheeler transform, and using those lengths to 
-estimate tc. As of now, there is no installer for this package, so usage is simply: 
+Generate estimates of first coalescent time, tc.  
+
+This documentation covers the usage of runtc.py and phase_singletons.py.
+
+## VCF Requirements
+
+Typically a vcf file should contain phased genotypes at all variable positions of a sample of individuals' genomes for a single chromosome. 
+
+If the file has not been phased at singleton sites,  then it should be first run through phase_singletons.py
+
+??missing data??
+?? multiallelic sites??
+??  non-snp sites??
+?? is '1' always assumed to be the derived allele?? 
+
+## phase_singletons.py
+
+This program takes as its main argument a vcf or vcf.gz file and returns to stdout a new file with new placements for singleton alleles as estimated from msh lengths. 
+In the course of its operation it also generates two temporary msh (or msh.gz) files which can be saved if desired, but are deleted by default. 
+
+#### Command line usage
+##### positional arguments:
+* vcfname              vcf or vcf.gz input file
+
+##### optional arguments:
+*  -h, --help           show this help message and exit
+*  --gzip               gzip temporary msh files
+*  --keep               save temporary msh and reversed vcf files
+
+Example.  To generate a new vcf.gz file from population1chr22.vcf.gz   
 ```
-python path/to/scripts/runtc_real.py [options]
+    python phase_singletons.py population1chr22.vcf.gz > population1chr2_singletonsphased.vcf.gz 
+```    
+	
+## runtc.py	
+
+runtc.py requires an input vcf file that has been phased for singletons (as described above).  
+It returns to stdout a table of estimated tc values.   In the course of a run, msh files and a reversed vcf file are generated.
+The most time consuming part of most analyses is the generation of msh files.  To speed this up, the program will use pypy3 if it has been installed and available
+(https://pypy.org/download.html). 
+
+The program can be used to simply generate msh files that are to be saved for futher analysis using the --msh-only option.  
+A subsequent run would then use the --resuse option.
+
+#### Command line usage
+usage: runtc.py [-h] [--alledges] [--gzip] [--k1] [--k-all]  
+                [--k-range K_RANGE K_RANGE] [--map MAPNAME] [--msh-only]  
+                [--mut MUT_RATE] [--n0 N0_MODEL] [--outfn OUTFN]  
+                [--outmsh OUTMSH] [--output-all-est] [--positions POSNAME]  
+                [--rec REC_RATE] [--rev-vcf REVNAME] [--reuse]  
+                [--randn RANDOM_N] [--seed RANDOM_N_SEED] [--sub SUBNAME]  
+                vcfname  
+  
+##### positional arguments:  
+* vcfname               vcf or vcf.gz input file  
+  
+##### optional arguments:  
+*  -h, --help            show this help message and exit    
+*  --alledges            If set, will run invariant site estimator on all external edges.  
+*  --gzip                Compress msh files  
+*  --k1                  Estimate tc values for singletons  
+*  --k-all               Estimate tc values for all variants  
+*  --k-range K_RANGE K_RANGE  Estimate tc values for inclusive range of k  
+*  --map MAPNAME         Genetic map to be used for calculating genetic distances (either --rec or --map must be used)  
+*  --msh-only            If set, will stop after generating files with msh values  
+*  --mut MUT_RATE        Mutation rate per base per generation (default = 1e-8)  
+*  --n0 N0_MODEL         Effective population size of sampled population (default: 10000)  
+*  --outfn OUTFN         Output name for file of estimates  
+*  --outmsh OUTMSH       Output label for msh files  
+*  --output-all-est      Output all estimates instead of mean/max, use with --alledges or for non-singletons  
+*  --positions POSNAME   List of base positions for which to generate estimates. Use with --alledges  
+*  --rec REC_RATE        Recombination rate per base per generation (either --rec or --map must be used)  
+*  --rev-vcf REVNAME     Path for reversed VCF file (by default this file will not be overwritten, even if --reuse is not invoked)  
+*  --reuse               Will reuse available msh files or available reversed VCF file named *_reversed.vcf  
+*  --randn RANDOM_N      use random_n chromosomes selected at random  
+*  --seed RANDOM_N_SEED  seed value to use with --randn  
+*  --sub SUBNAME         name of file with list of chromosome numbers to which analyses are limited (values are 0-based)  
+				
+#### Required Options
+
+All runs require the following:
+
+* vcf filename 
+* --mut
+* one of [--rec, --map]  
+* one of [--alledges, --k1,  --k-range, --k-all]
+
+If --msh-only is being used and the program is being used to generate msh files, then in addition to the above arguments, the following are required:
+* --msh-only
+* --outmsh  
+
+if --reuse is being used to run on previously generated msh files then following are required
+* --resuse 
+* --outmsh  (followed by the same name used in the previous run using --msh-only) 
+
+#### Examples
+Examples using vcf file runtcexample.vcf which had been previously run through phase_singletons.py.  
+
+To generate msh files for a run that will generate estimates at all SNPs with a genetic map in runtcexample.map and a mutation rate of 1e-8
+```
+python runtc.py  runtcexample.vcf --msh-only --mut 1e-8 --rec 1e-8 --k-all --outmsh example1 
+
+```
+To estimate tc values for all snps using previously saved msh files 
+```
+python runtc.py runtcexample.vcf --reuse --mut 1e-8 --rec 1e-8 --k-all --outmsh example1  > example2_kall.out 
 ```
 
-The only required argument is a VCF file, either uncompressed or gzipped. Using the default options, the runtc_real script will filter out any non-biallelic sites, indels, and sites with missing data, then
-generate tc estimates for every singleton in a VCF file, while not counting singletons toward the termination of MSH tracts. 
-Both haplotypes from an individual with the singleton at a site will have tc estimated, with the larger estimate returned as
-the chosen one. The output file has two columns: physical position and estimate. 
+Genetic map files have two columns of values, with the first column being ordered base positions (small to large) and the second column being 
+the distance to that same point in centimorgans.  
 
-An example estimates file, at 'test/test_alpha_estimates.txt', contains estimates for alpha values at each SNP in the
-provided VCF file, 'test/test_head.vcf'. The commandline used to generate a file for comparison:
+To estimate tc values for singletons using a genetic map  
 ```
-python msh_est/runtc_real.py test/test_head.vcf --alpha --mut 1e-9 --outest test_estimates.txt
+python runtc.py runtcexample.vcf --mut 1e-8 --map runtcexample.map --k1   > example3_k1.out 
 ```
-This will reverse the VCF file (creating a 'test/test_head_reversed.vcf' file), generate MSH lengths for every haplotype
-at every SNP in the VCF file (--alpha), and generate an alpha estimate for each SNP using a chosen mutation rate. A diff 
-between this file and the test/test_alpha_estimates.txt files will likely show differences, but the estimates themselves should be similar.
 
-### Model Options
---n0 [pop_size]: sample population size (default 1000)
 
---mut [mutation_rate] : Mutation rate per base pair (default 1e-8)
 
---rec [recomb_rate]: Recombination rate per base pair (default 1e-8)
 
---exp-model [growth rate]: Use estimator with exponential population growth model, providing value for growth rate
-per generation
 
---twophase-model [growth_rate] [growth_start]: Use estimator with a constant population size followed by an exponential 
-phase growing at (growth_rate) starting (growth_start) generations ago.
 
-### Analysis Options
 
---alpha: Instead of only generating tc estimates for singletons, will identify MSH for every haplotype at all sites and 
-output the geometric mean of the tc estimates generated per site.
 
---include-singletons: Allow singleton sites to terminate MSH lengths.
 
---k-range [low_bound] [high_bound]: For variants with allele counts within the specified range, find every derived allele's longest MSH shared with a haplotype with the reference allele, then use composite estimator to generate tc estimate for that site.
 
---k-all: Same as --k-range, but will do for all sites.
-
-### Input options
-
---pypy: Use Pypy for reversing files and calculating lengths. Defaults to pypy3. If any errors are encountered, will run in standard python mode. 
-
---rev [reversed_vcfname]: Filename for reversed VCF file, if reversal is done outside of pipeline. This will prevent automatic generation of 
-reversed VCF file.
-
---map [map_filename]: Filename for genetic map file, with column 1 having physical positions and column 2 having corresponding genetic 
-positions.
-
---reuse: If length/reversed VCF files are present for given output prefix, will not attempt to regenerate them.
-
-### Output options:
-
---outmsh [out_prefix]: Prefix for MSH length files (defaults to name of input VCF stripped of .vcf extension).
-
---outest [est_filename]: Name for output estimates file (default is stdout).
-
---gzip: Will compress length files.
-
---lengths-only: Will stop pipeline once lengths are generated.
 
 
