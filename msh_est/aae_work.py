@@ -35,7 +35,8 @@ def createParser():
     parser.add_argument("--gen",dest="genname",type=str)
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--pos",dest="pos",action="store_true")
-    parser.add_argument("--decmode",dest="decmode",action="store_true")
+    parser.add_argument("--kmode",dest="kmode",action="store_true")
+    parser.add_argument("--seed",dest="seed",type=int)
     modelgroup = parser.add_mutually_exclusive_group()
     modelgroup.add_argument("--exp-model",dest="expmodel",type=float,help=("Use "
                             "exponential population model with given growth rate"))
@@ -192,6 +193,8 @@ def fullStr(d):
 def run_estimator(args):
     parser = createParser()
     args = parser.parse_args(args)
+    if args.seed is not None:
+        np.random.seed(args.seed)
     if args.left_file[-3:] == '.gz':
         fl = gzip.open(args.left_file,'r')
     else:
@@ -324,7 +327,7 @@ def run_estimator(args):
         est_str = ''
         #if args.nosnp:
         dl1.clear()
-        if not args.decmode:
+        if not args.kmode:
             for i in range(start_inds,input_length):
                 d = makeData(la1,la2,i,has_genetic_positions,recperbp,mu,mc,
                             prev_right_pos,prev_right_gen,length_offset,forceleftnone=hasleftmissing,forcerightnone=hasrightmissing)
@@ -352,7 +355,7 @@ def run_estimator(args):
                 else:
                     outf.write(str(cur_right_pos)+'\t'+est_str)
             else:
-                sys.stderr.write("pos %d: no valid data\n"%prev_right_pos)
+                sys.stderr.write("pos %d: no valid data\n"%cur_right_pos)
                 est_str = ''
         else:
             input_length = len(la2)
@@ -375,8 +378,12 @@ def run_estimator(args):
             prev_right_gen = cur_right_gen
         if right_done:
             break
+
+    outf.close()
+    fl.close()
+    fr.close()
 ##    jh 7/11/2019  stopped writing this,  though can be useful in development/debugging
-##    if args.cache and args.alledges and not args.decmode:
+##    if args.cache and args.alledges and not args.kmode:
 ##        sys.stderr.write("Cache: %d of %d hits (%f rate)\n" % (dl1.cache_hits,dl1.cache_total,float(dl1.cache_hits)/max(float(dl1.cache_total),1)))
 
 if __name__ == "__main__":

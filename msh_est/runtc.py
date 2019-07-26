@@ -28,11 +28,12 @@ def createParser():
 
     parser.add_argument("vcfname",type=str,help="vcf or vcf.gz input file")
     k_edges_group.add_argument("--alledges",dest="alledges",action="store_true",help="If set, will run invariant site estimator on all external edges.")
-    parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Compress msh files")
     k_edges_group.add_argument("--k1",dest="k1",action="store_true",help=("Estimate tc values for singletons"))  ## k1 for singletons is not really necessary as it is the default run mode, but use it for clarity
     k_edges_group.add_argument("--k-all",dest="k_all",action="store_true",help=("Estimate tc values for all variants"))
     k_edges_group.add_argument("--k-range",dest="k_range",type=int,nargs=2,help=("Estimate tc values for inclusive range of k"))
     rec_group.add_argument("--map",dest="mapname",type=str,help="Genetic map to be used for calculating genetic distances (either --rec or --map must be used)")
+    rec_group.add_argument("--rec",dest="rec_rate",type=float,help="Recombination rate per base per generation (either --rec or --map must be used)")
+    parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Compress msh files")
     parser.add_argument("--msh-only",dest="msh_only",action="store_true",help="If set, will stop after generating files with msh values")
     parser.add_argument("--mut",dest="mut_rate",type=float,help="Mutation rate per base per generation (default = 1e-8)")
     parser.add_argument("--n0",dest="n0_model",type=int,default=10000,help="Effective population size of sampled population (default: 10000)")
@@ -40,11 +41,12 @@ def createParser():
     parser.add_argument("--outmsh",dest="outmsh",type=str,help="Output label for msh files")
     parser.add_argument("--output-all-est",dest="all_est",action="store_true",help=("Output all estimates instead of mean/max, use with --alledges or for non-singletons"))
     parser.add_argument("--positions",dest="posname",type=str,help="List of base positions for which to generate estimates. Use with --alledges")
-    rec_group.add_argument("--rec",dest="rec_rate",type=float,help="Recombination rate per base per generation (either --rec or --map must be used)")
     parser.add_argument("--rev-vcf",dest="revname",type=str,help="Path for reversed VCF file (by default this file will not be overwritten, even if --reuse is not invoked)")
     parser.add_argument("--reuse",dest="force_overwrite",action="store_false",help="Will reuse available msh files or available reversed VCF file named *_reversed.vcf")
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
+    parser.add_argument("--keep-msh-files",action="store_true",help=argparse.SUPPRESS)
+    parser.add_argument("--est-seed",dest="est_seed",type=int,help=argparse.SUPPRESS)
     subgroup.add_argument("--sub",dest="subname",type=str,help="name of file with list of chromosome numbers to which analyses are limited (values are 0-based)")
 
     # args with help suppressed as of 7/12/2019
@@ -91,13 +93,15 @@ def splitArgsForEstimator(args):
     if args.posname is not None:
         arglist.append('--pos')
     if args.k_all or args.k_range is not None:
-        arglist.append("--decmode")
+        arglist.append("--kmode")
     if args.expmodel is not None:
         arglist.extend(['--exp-model',str(args.expmodel)])
     if args.twophase is not None:
         arglist.extend(['--twophase-model',str(args.twophase[0]),str(args.twophase[1])])
     if args.all_est:
         arglist.append("--output-all-est")
+    if args.est_seed is not None:
+        arglist.extend(['--seed',str(args.est_seed)])
     return arglist
 
 def splitArgsForLengths(args,rvcfname):
@@ -269,8 +273,10 @@ def main(argv):
     args = parser.parse_args(argv)
 
 ##    k_edges_group
-    if not (args.alledges or args.k1 or args.k_all or args.k_range):
-        parser.error('one of [--alledges, --k1,  --k-range, --k-all]  must be invoked')
+    #if not (args.alledges or args.k1 or args.k_all or args.k_range):
+    #    parser.error('one of [--alledges, --k1,  --k-range, --k-all]  must be invoked')
+    if not (args.alledges or args.k_all or args.k_range):
+        args.k1 = True
 ##  rec_group options
     if not (args.rec_rate or args.mapname):
         parser.error('one of [--rec, --map]  must be invoked')
@@ -278,6 +284,10 @@ def main(argv):
         parser.error("--mut must be used")
     if args.msh_only and not args.outmsh:
         parser.error("--outmsh must be used with --msh-only")
+    if args.k_range is not None and args.k_range[0] < 2:
+        parser.error("--k-range requires a range start 2 or greater")
+    if args.k_range is not None and args.k_range[0] > args.k_range[1]:
+        parser.error("Start of --k-range must be not be greater than end")
 
 
     est_args = makemshfiles(args)
@@ -297,10 +307,11 @@ def main(argv):
                 tempstr += " adjacent to SNPs"
         sys.stderr.write("Generating estimates (%s): %s\n" % (tempstr,str(est_args)))
         estat = run_estimator(est_args)
-        if os.path.exists(est_args[0]):
-            os.remove(est_args[0])
-        if os.path.exists(est_args[1]):
-            os.remove(est_args[1])
+        if not args.keep_msh_files:
+            if os.path.exists(est_args[0]):
+                os.remove(est_args[0])
+            if os.path.exists(est_args[1]):
+                os.remove(est_args[1])
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:

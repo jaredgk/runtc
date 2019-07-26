@@ -525,6 +525,7 @@ def getmsh(args):
             writeToFile(outf,out_string,compress_out)
 
     outf.close()
+    vcf.close()
     return outfn
 
 if __name__ == "__main__":

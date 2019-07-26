@@ -526,7 +526,9 @@ class datalist(list):
             assert ( self[-1].model == None and self[-2].model == None) or self[-1].model.popmodel == self[-2].model.popmodel
 
     def clear(self):
-        super(datalist, self).clear() ## not sure why this works, but it overrides append
+        #super(datalist, self).clear() ## not sure why this works, but it overrides append
+        #print (issubclass(datalist,list))
+        super(datalist,self).clear()
         assert len(self) == 0
 
     def setmodel(model):
