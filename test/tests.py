@@ -6,6 +6,7 @@ import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.pardir,'msh_est')))
 from msh_from_vcf import getmsh
 from aae_work import run_estimator
+import runtc
 
 class basicTest(unittest.TestCase):
     
@@ -60,6 +61,17 @@ class estTest(unittest.TestCase):
         args = ['test_kall_est_left_msh.txt','test_kall_est_right_msh.txt','--n','50','--n0','10000','--mut','1e-8','--rec','1e-8','--kmode','--round','3','--outfn','test_est.txt','--seed','1']
         run_estimator(args)
         self.assertTrue(filecmp.cmp('test_est.txt','test_est_kall_est.txt'))
+
+    def test_twophase_est(self):
+        args = ['test_est_left_msh.txt','test_est_right_msh.txt','--n','50','--n0','10000','--mut','1e-8','--rec','1e-8','--round','3','--outfn','test_est.txt','--seed','1','--twophase','.01','100']
+        run_estimator(args)
+        self.assertTrue(filecmp.cmp('test_est.txt','test_est_twophase_est.txt'))
+
+class fullTest(unittest.TestCase):
+    def test_basic(self):
+        args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run']
+        runtc.main(args)
+        self.assertTrue(filecmp.cmp('test_est.txt','test_full_run.txt'))
 
 #other tests: with genetic distances, estimator?
 

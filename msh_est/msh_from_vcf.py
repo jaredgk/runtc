@@ -411,6 +411,7 @@ def getmsh(args):
     gen_list = None
     a = None
     d = None
+    current_chrom = None
     if gen_flag:
         gen_list = []
     if args.outname is not None:
@@ -435,6 +436,10 @@ def getmsh(args):
             continue
         if len(la[3]) != 1 or len(la[4]) != 1:
             continue
+        if current_chrom is None:
+            current_chrom = la[0]
+        if la[0] != current_chrom:
+            raise Exception("Source VCF cannot contain multiple chromosomes")
         noninf_pos = None
         noninf_gen = None
         singleton_idx = None

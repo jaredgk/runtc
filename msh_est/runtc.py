@@ -202,7 +202,7 @@ def runWithPypy(pypy_version, script_name, args):
     sub_string = pypy_version+' '+exec_path+' '+' '.join(map(str,args))
     subprocess_return = subprocess.run(sub_string,shell=True)
     if subprocess_return.returncode != 0:
-        sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')
+        sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')       
     return subprocess_return.returncode
 
 
