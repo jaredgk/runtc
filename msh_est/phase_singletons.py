@@ -113,7 +113,8 @@ def phase_with_lengths(sysargs):
 
     ## set options for runtc.makemshfiles()
     args.outmsh = vcftag + "_singleton_phasing"
-    args.revname = rvcfname
+    #args.revname = rvcfname
+    args.revname = None
     args.lengths_only = True
     args.exc_sing = True
 ##    args.revname = None
@@ -140,13 +141,15 @@ def phase_with_lengths(sysargs):
     args.expmode = None
     args.expmodel = None
     args.twophase = None
-
+    args.est_seed = None
 
     runtcestargs = runtc.makemshfiles(args)
     args.left_lengths = runtcestargs[0]
     args.right_lengths = runtcestargs[1]
+    vcf_decode = False
     if args.vcfname[-3:] == '.gz':
         vcf = gzip.open(args.vcfname,'r')
+        vcf_decode = True
     else:
         vcf = open(args.vcfname,'r')
     left_decode = False
@@ -178,10 +181,13 @@ def phase_with_lengths(sysargs):
     current_right_la = right_line.strip().split()
     current_pos = int(current_left_la[0])
     for line in vcf:
+        if vcf_decode:
+            line = line.decode()
         if line[0] == '#':
             sys.stdout.write(line)
             continue
         la = line.strip().split()
+        print (la)
         pos = int(la[1])
         if pos != current_pos:
             sys.stdout.write(line)

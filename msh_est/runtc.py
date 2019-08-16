@@ -200,9 +200,12 @@ def decompressFile(fn,tempfn):
 def runWithPypy(pypy_version, script_name, args):
     exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),script_name)
     sub_string = pypy_version+' '+exec_path+' '+' '.join(map(str,args))
-    subprocess_return = subprocess.run(sub_string,shell=True)
+    subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
     if subprocess_return.returncode != 0:
-        sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')       
+        sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')
+        if 'multiple chromosomes' in subprocess_return.stderr:
+            sys.stderr.write(subprocess_return.stderr+'\n')
+            exit()
     return subprocess_return.returncode
 
 
