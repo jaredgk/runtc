@@ -2,11 +2,20 @@ import unittest
 import filecmp
 import os
 import sys
+import subprocess
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.pardir,'msh_est')))
 from msh_from_vcf import getmsh
 from aae_work import run_estimator
 import runtc
+
+def callCCode(arglist):
+    full_arglist = ['../msh_est/msh_vcf']+arglist
+    print (full_arglist)
+    s_call = subprocess.Popen(full_arglist,stdout=subprocess.PIPE,stderr=subprocess.PIPE)
+    s_o,s_e = s_call.communicate()
+    if s_call.returncode != 0:
+        raise Exception("Error running c code\n%s"%(s_e.decode()))
 
 class basicTest(unittest.TestCase):
     
@@ -72,6 +81,40 @@ class fullTest(unittest.TestCase):
         args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run']
         runtc.main(args)
         self.assertTrue(filecmp.cmp('test_est.txt','test_full_run.txt'))
+
+
+class cppTest(unittest.TestCase):
+    
+    def test_alpha_withsgtn(self):
+        args = ['--vcf','test_head.vcf','--include-singletons','--out','test_head_ll.txt']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_alpha_ws.txt'))
+#other tests: with genetic distances, estimator?
+
+    def test_alpha_nosgtn(self):
+        args = ['--vcf','test_head.vcf','--out','test_head_ll.txt']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_alpha_ns.txt'))
+
+    def test_singleton_withsgtn(self):
+        args = ['--vcf','test_head.vcf','--include-singletons','--singleton','--out','test_head_ll.txt']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ws.txt'))
+
+    def test_singleton_nosgtn(self):
+        args = ['--vcf','test_head.vcf','--singleton','--out','test_head_ll.txt']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ns.txt'))
+
+    def test_kall_withsgtn(self):
+        args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt','--include-singletons']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_kall_ws.txt'))
+
+    def test_kall_nosgtn(self):
+        args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt']
+        callCCode(args)
+        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_kall_ns.txt'))
 
 #other tests: with genetic distances, estimator?
 
