@@ -60,7 +60,7 @@ def createParser():
     parser.add_argument("--nosquish",dest="squish",action="store_false",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Read all lines from genetic map even if regions end up with 0 cM/bp rate")
     parser.add_argument("--nocache",dest="cache",action="store_false",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Turn off caching of estimates in estimator")
     parser.add_argument("--bin",dest="bin",action="store_true",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Calculate estimates by linear interpolation of geometrically-distributed pre-calculated estimates")
-
+    parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")
     return parser
 
 def splitArgsForEstimator(args):
@@ -208,6 +208,14 @@ def runWithPypy(pypy_version, script_name, args):
             exit()
     return subprocess_return.returncode
 
+def runCMsh(args):
+    exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
+    sub_string = exec_path+' '+' '.join(map(str,args))
+    subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
+    if subprocess_return.returncode != 0:
+        sys.stderr.write("Issue with C msh_vcf\n")
+    return subprocess_return.returncode
+
 
 def makemshfiles(args):
     #print ("Start : "+datetime.datetime.now())
@@ -244,14 +252,18 @@ def makemshfiles(args):
     if args.force_overwrite or not isfile(leftmshfname):
         sys.stderr.write("Creating left msh values: %s\n" %(str(msh_left_args)))
         retcode = 1
-        if usepypy:
+        if args.c_msh:
+            retcode = runCMsh(msh_left_args)
+        elif usepypy:
             retcode = runWithPypy(PYPY_VERSION,'msh_from_vcf.py',msh_left_args)
         if retcode != 0:
             getmsh(msh_left_args)
     #print ("Left msh values: "+datetime.datetime.now())
     if args.force_overwrite or (not isfile(rightreversedmshfname) and not isfile(rightmshfname)):
         sys.stderr.write("Creating right msh values: %s\n" % (str(msh_right_args)))
-        if usepypy:
+        if args.c_msh:
+            retcode = runCMsh(msh_right_args)
+        elif usepypy:
             retcode = runWithPypy(PYPY_VERSION,'msh_from_vcf.py',msh_right_args)
         if retcode != 0:
             getmsh(msh_right_args)

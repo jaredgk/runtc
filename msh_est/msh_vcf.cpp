@@ -35,6 +35,11 @@ class snp_data {
             allele_count = ac;
             position = pos;
             alleles = as;
+            //cerr << position << "\t" << allele_count << endl;
+        }
+        snp_data() {
+            allele_count = -1;
+            position = -1;
         }
 };
 
@@ -45,7 +50,7 @@ double getGenCol(string line, int col, double & phys) {
     for(int i = 0; i < col; i++) {
         s >> j;
     }
-    bool b = (s >> out);
+    bool b = bool(s >> out);
     if(!b) { return -1.0; }
     return out;
 }
@@ -137,8 +142,9 @@ int getAc(vector<char> alleles) {
     return out;
 }
 
-snp_data parseVcfLine(string line) {
-    vector<string> la = split(line,"\t");
+//snp_data parseVcfLine(string & line) {
+//    vector<string> la = split(line,"\t");
+snp_data parseVcfLine(vector<string> &la) {
     vector<char> alleles = getAlleles(la);
     int ac = getAc(alleles);
     int pos = atoi(la[1].c_str());
@@ -147,31 +153,99 @@ snp_data parseVcfLine(string line) {
 
 }
 
+snp_data parseVcfLine2(string & line, int presize, vector<int> &sub_list, bool sub_flag) {
+    stringstream s(line);
+    string junk, info, ref, alt, chrom;
+    int phys;
+    vector<char> alleles(presize,'0');
+    s >> chrom >> phys >> junk >> ref >> alt >> junk >> junk >> info >> junk;
+    if (ref.size() != 1 || alt.size() != 1 || info.find("CPG_TAG") != string::npos) {
+        snp_data out;
+        return out;
+    }
+    string hap;
+    int ac = 0;
+    int sub_idx = 0;
+    int sub_total = sub_list.size();
+    int hap_count = 0;
+    while (s >> hap) {
+        /*if (hap[0] != '0') {
+            ac++;
+        }
+        if (hap[2] != '0') {
+            ac++;
+        }
+        alleles.push_back(hap[0]);
+        alleles.push_back(hap[2]);*/
+        int geno_idx = 0;
+        string delim_str = "/|";
+        while (geno_idx == 0 || delim_str.find(hap[geno_idx-1]) != string::npos) {
+            if (sub_flag) {
+                if (sub_list[sub_idx] == hap_count) {
+                    sub_idx++;
+                } else {
+                    geno_idx+=2;
+                    hap_count++;
+                    continue;
+                }
+            }
+            if (hap[geno_idx] != '0') {
+                ac++;
+            }
+            alleles.push_back(hap[geno_idx]);
+            geno_idx+=2;
+            hap_count++;
+            if (sub_total != 0 && sub_total == sub_idx) { break; }
+        }
+
+    }
+    snp_data out(ac,phys,alleles);
+    return out;
+}
+
 void updateVectors(vector<int> & a, vector<int> & d, vector<char> alleles, int current_snp) {
     int p = current_snp+1;
     int q = current_snp+1;
-    vector<int> a_new;
-    vector<int> d_new;
-    vector<int> b;
-    vector<int> e;
-    for(int i = 0; i < a.size(); i++) {
+    int size = a.size();
+    vector<int> a_new(size,0);
+    vector<int> d_new(size,0);
+    vector<int> b(size,0);
+    vector<int> e(size,0);
+    int ref_i = 0;
+    int alt_i = 0;
+    for(int i = 0; i < size; i++) {
         p = max(d[i],p);
         q = max(d[i],q);
         if (alleles[a[i]] == '0') {
-            a_new.push_back(a[i]);
-            d_new.push_back(p);
+            //a_new.push_back(a[i]);
+            //d_new.push_back(p);
+            a_new[ref_i] = a[i];
+            d_new[ref_i] = p;
+            ref_i++;
             p = 0;
         } else {
-            b.push_back(a[i]);
-            e.push_back(q);
+            //b.push_back(a[i]);
+            //e.push_back(q);
+            b[alt_i] = a[i];
+            e[alt_i] = q;
+            alt_i++;
             q=0;
         }
     }
-    a_new.insert(a_new.end(),b.begin(),b.end());
+    /*a_new.insert(a_new.end(),b.begin(),b.end());
     d_new.insert(d_new.end(),e.begin(),e.end());
     for(int i = 0; i < a.size(); i++) {
         a[i] = a_new[i];
         d[i] = d_new[i];
+    }*/
+    int alt_size = ref_i;
+    for(int i = 0; i < alt_size; i++) {
+        a[i] = a_new[i];
+        d[i] = d_new[i];
+    }
+    for(int i = alt_size; i < size; i++) {
+        a[i] = b[i-alt_size];
+        d[i] = e[i-alt_size];
     }
     return;
 }
@@ -388,32 +462,47 @@ vector<int> d_start(int sc) {
     return out;
 }
 
+bool positionCondition(vector<int> &outpos_list, int outpos_idx, int pos, bool revpos_flag) {
+    if (outpos_idx == outpos_list.size()) { return false; }
+    if (revpos_flag && outpos_list[outpos_idx] >= pos) { return true; }
+    if (!revpos_flag && outpos_list[outpos_idx] < pos) { return true; }
+    return false; 
+}
+
 int main(int argc, char ** argv) {
     setbuf(stdout,NULL);
     string filename = "-";// = argv[1];
-    bool include_singletons = false;
+    bool include_singletons = true;
     bool singleton_mode = false;
     string outfilename = "default.out";
     string mapname = "";
+    string posname = "";
+    string subname = "";
     int map_colidx = 0;
     int round_sigfig = -1;
     bool squish_map = true;
     bool map_cm = true;
     bool use_genmap = false;
+    bool pos_flag = false;
     bool k_mode = false;
     bool k_all = false;
+    bool revpos = false;
+    bool sub_flag = false;
     int k_low = -1;
     int k_hi = -1;
     for(int i = 1; i < argc; i++) {
         string arg = argv[i];
         if(arg == "--vcf") { filename = argv[++i]; }
-        else if(arg == "--include-singletons") { include_singletons = true; }
+        else if(arg == "--exclude-singletons") { include_singletons = false; }
         else if(arg == "--singleton") { singleton_mode = true; }
         else if(arg == "--out") { outfilename = argv[++i]; }
         else if(arg == "--map") { use_genmap = true; mapname = argv[++i]; }
         else if(arg == "--gen-idx") { map_colidx = atoi(argv[++i]); }
         else if(arg == "--nosquish") { squish_map = false; }
         else if(arg == "--round") { round_sigfig = atoi(argv[++i]); }
+        else if(arg == "--positions") { pos_flag = true; posname = argv[++i]; }
+        else if(arg == "--revpos") { revpos = true; }
+        else if(arg == "--sub") { sub_flag = true; subname = argv[++i]; }
         else if(arg == "--k-all") { k_mode = true; k_all = true; }
         else if(arg == "--k-range") { k_mode = true; k_low = atoi(argv[++i]); 
                                       k_hi = atoi(argv[++i]);
@@ -435,7 +524,37 @@ int main(int argc, char ** argv) {
     if (round_sigfig != -1) {
         cout << setprecision(round_sigfig);
     }
+    vector<int> outpos_list;
+    ifstream posf;
     string line;
+    int tpos;
+    int outpos_idx;
+    if (posname.compare("") != 0) {
+        posf.open(posname.c_str());
+        while(getline(posf,line)) {
+            tpos = atoi(line.c_str());
+            if (revpos) {
+                outpos_list.insert(outpos_list.begin(),tpos);
+            } else {
+                outpos_list.push_back(tpos);
+            }
+        }
+        outpos_idx = 0;
+        pos_flag = true;
+    }
+
+    vector<int> sub_list;
+    ifstream subf;
+    if (subname.compare("") != 0) {
+        subf.open(subname.c_str());
+        while (getline(subf,line)) {
+            tpos = atoi(line.c_str());
+            sub_list.push_back(tpos);
+        }
+        sort(sub_list.begin(),sub_list.end());
+        sub_flag = true;
+    }
+
     int snp_count = 0;
     int sample_count = 0;
     vector<int> a;
@@ -448,58 +567,77 @@ int main(int argc, char ** argv) {
     while (getline(*ins,line)) {
         if (line.size() == 0) { break; }
         if (line[0] == '#') { continue; }
-        vector<string> la = split(line,"\t");
+        /*vector<string> la = split(line,"\t");
         if (la[3].size() != 1 || la[4].size() != 1) { continue; }
         if (la[7].find("CPG_TAG") != string::npos) { continue; }
-        snp_data sd = parseVcfLine(line);
+        snp_data sd = parseVcfLine(la);*/
+        snp_data sd = parseVcfLine2(line,0,sub_list,sub_flag);
+        if (sd.position == -1) { continue; }
+        //cerr << sd.allele_count << "\t" << sd.position << endl;
         bool is_singleton = false;
         int noninf_pos = -1;
         int k_pos = -1;
         double noninf_gen, k_gen;
         vector<int> out_range;
         vector<int> k_idxlist;
-        if (sd.allele_count == 0 || sd.allele_count == sd.alleles.size()) { continue; }
-        if (sd.allele_count == 1 || sd.allele_count == sd.alleles.size()-1 ) {
+        if (sample_count == 0) { sample_count = sd.alleles.size(); }
+        if (sd.allele_count == 0 || sd.allele_count == sample_count) { continue; }
+        if (sd.allele_count == 1 || sd.allele_count == sample_count-1 ) {
             if (!singleton_mode && !k_mode) {
                 if (!include_singletons) {
                     continue;
                 }
             } else if (!k_mode) {
 
-                noninf_pos = stoi(la[1]);
+                noninf_pos = sd.position;//stoi(la[1]);
                 if(use_genmap) { noninf_gen = genetic_map.getGenPos(noninf_pos); }
                 //singleton_idx = getSingletonIdx(sd);
             }
+            if (k_all && sd.allele_count == 1 && !include_singletons) {
+                continue;
+            }
         }
-        if (k_mode && (k_all || (sd.allele_count >= k_low && sd.allele_count <= k_hi))) {
+        bool do_k = (k_all && sd.allele_count != 1);
+
+        if (k_mode && (do_k || (sd.allele_count >= k_low && sd.allele_count <= k_hi))) {
             k_idxlist = getKIdxList(sd);
-            k_pos = atoi(la[1].c_str());
+            k_pos = sd.position;//atoi(la[1].c_str());
             if (use_genmap) {
                 k_gen = genetic_map.getGenPos(k_pos);
             }
         }
         if (snp_count == 0) {
-            sample_count = sd.alleles.size();
+            //sample_count = sd.alleles.size();
             a = a_start(sample_count);
             d = d_start(sample_count);
+        }
+        if (pos_flag) {
+            while(positionCondition(outpos_list,outpos_idx,sd.position,revpos)) {
+                int opos = outpos_list[outpos_idx];
+                out_range = getFullIdxList(sample_count);
+                double gpos = (gen_list.size() == 0 ? 0 : genetic_map.getGenPos(opos));
+                string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,opos,gpos,sample_count,use_genmap,round_sigfig);
+                outf << out_string;
+                outpos_idx++;
+            }
         }
         if(singleton_mode && (noninf_pos != -1)) {
             out_range = getSingletonIdxList(sd);
             string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,noninf_pos,noninf_gen,sample_count,use_genmap,round_sigfig);
             outf << out_string;
         }
-        if(k_mode) {
+        if(k_pos != -1) {
             string out_string = getMshString(a,d,k_idxlist,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig);
             outf << out_string;
         }
         if (!singleton_mode || noninf_pos == -1 || include_singletons) {
-            int pos_add = atoi(la[1].c_str());
+            int pos_add = sd.position;//atoi(la[1].c_str());
             pos_list.push_back(pos_add);
             if(use_genmap) { gen_list.push_back(genetic_map.getGenPos(pos_add)); }
             updateVectors(a,d,sd.alleles,snp_count);
             snp_count += 1;
         }
-        if (!singleton_mode && !k_mode) {
+        if (!singleton_mode && !k_mode && !pos_flag) {
             out_range = getFullIdxList(sample_count);
             double gpos = (gen_list.size() == 0 ? 0 : gen_list[gen_list.size()-1]);
             string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,pos_list[pos_list.size()-1],gpos,sample_count,use_genmap,round_sigfig);
