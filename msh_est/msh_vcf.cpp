@@ -470,6 +470,38 @@ bool positionCondition(vector<int> &outpos_list, int outpos_idx, int pos, bool r
 }
 
 int main(int argc, char ** argv) {
+    if (argc == 1 || argv[1] == "-h" || argv[1] == "--help") {
+        cerr << "usage: ./msh_vcf [-h] [--vcf VCFNAME] [--gen GENNAME] [--sub SUBNAME]\n"
+        "               [--out OUTNAME] [--gen-idx GENIDX] [--nosquish]\n"
+        "               [--round ROUND]\n"
+        "               [--k-all | --k-range K_START K_END | --singleton]\n"
+        "               [--positions POSNAME]\n"
+        "               [--exclude-singletons] [--revpos]\n"
+        "\n"
+        "Arguments:\n"
+        "-h, --help            show this help message and exit\n"
+        "--vcf VCFNAME         Input VCF filename, either uncompressed or gzipped\n"
+        "--gen GENNAME         Name of map file\n"
+        "--sub SUBNAME         Name of file with subsample indices\n"
+        "--out OUTNAME         Name of output msh file\n"
+        "--gen-idx GENIDX      Use [i+2]th column of genetic map file for genetic\n"
+        "                      distances\n"
+        "--nosquish            Read all rows in map file, not just rows with\n"
+        "                      differing genetic distances\n"
+        "--round ROUND         Round floats to this many significant figures\n"
+        "--k-all               Return estimatesfor every variant\n"
+        "--k-range K_START K_END\n"
+        "                      Return estimates for every variant with allele count\n"
+        "                      in given range\n"
+        "--singleton           Singleton mode: Generate two msh values, one for each\n"
+        "                      haplotype of an individual with a singleton\n"
+        "--positions POSNAME   File with positions for alledges estimates\n"
+        "--exclude-singletons  DO NOT Allow singletons to terminate MSH lengths\n"
+        "--revpos              If using --positions, indicate this is for right\n"
+        "                      length generation and input VCF is reversed\n";
+        exit(1);
+
+    }
     setbuf(stdout,NULL);
     string filename = "-";// = argv[1];
     bool include_singletons = true;
