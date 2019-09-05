@@ -72,7 +72,7 @@ class gen_map {
             double a,b;
             double rate = 1;
             if (cm) { rate = .01; }
-            getline(gm,line);
+            //getline(gm,line);
             while(gm) {
                 getline(gm,line);
                 b = getGenCol(line,idx,a);
@@ -89,8 +89,8 @@ class gen_map {
                 }
                 //if(gm.eof()) { break; }
             }
-            cerr << phys_pos[0] << "\t" << gen_pos[0] << "\t" << phys_pos[phys_pos.size()-1] << "\t" << gen_pos[gen_pos.size()-1] << endl;
-            cerr << phys_pos.size() << endl;
+            //cerr << phys_pos[0] << "\t" << gen_pos[0] << "\t" << phys_pos[phys_pos.size()-1] << "\t" << gen_pos[gen_pos.size()-1] << endl;
+            //cerr << phys_pos.size() << endl;
         }
         gen_map() { }
         double getGenPos(int position) {
@@ -528,7 +528,7 @@ int main(int argc, char ** argv) {
         else if(arg == "--exclude-singletons") { include_singletons = false; }
         else if(arg == "--singleton") { singleton_mode = true; }
         else if(arg == "--out") { outfilename = argv[++i]; }
-        else if(arg == "--map") { use_genmap = true; mapname = argv[++i]; }
+        else if(arg == "--gen") { use_genmap = true; mapname = argv[++i]; }
         else if(arg == "--gen-idx") { map_colidx = atoi(argv[++i]); }
         else if(arg == "--nosquish") { squish_map = false; }
         else if(arg == "--round") { round_sigfig = atoi(argv[++i]); }

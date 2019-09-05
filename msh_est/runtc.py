@@ -45,22 +45,28 @@ def createParser():
     parser.add_argument("--reuse",dest="force_overwrite",action="store_false",help="Will reuse available msh files or available reversed VCF file named *_reversed.vcf")
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
+    parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")  
     parser.add_argument("--keep-msh-files",action="store_true",help=argparse.SUPPRESS)
     parser.add_argument("--est-seed",dest="est_seed",type=int,help=argparse.SUPPRESS)
     subgroup.add_argument("--sub",dest="subname",type=str,help="name of file with list of chromosome numbers to which analyses are limited (values are 0-based)")
-
     # args with help suppressed as of 7/12/2019
+ 
     modelgroup.add_argument("--exp-model",dest="expmodel",type=float,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help=("Use exponential population model with given growth rate"))
+ 
     modelgroup.add_argument("--twophase-model",dest="twophase",nargs=2,type=float,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original  help=("Use two-phase (constant pop size then exp growth) model, with growth rate as first argument and growth time in generations as second"))
     parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original
     parser.add_argument("--nopypy",dest="no_pypy",action="store_true",default = False,help=argparse.SUPPRESS) ## suppressed and changed 7/11/2019 JH changed from  parser.add_argument("--pypy",dest="use_pypy",action="store_true",help="If set, use pypy to accelerate length generation")
     parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_false",help=argparse.SUPPRESS) ## changed from --include-singletons and suppressed 7/11/2019 JH  original help="Includes singletons when determining MSH cutoffs")
+
+
     parser.add_argument("--round",dest="round",type=int,default=3,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Round chi values to set number of significant digits for caching, -1 for no rounding")
     parser.add_argument("--snp-mode",dest="snp_mode",action="store_true",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Report msh values from adjacent variants (instead of region)")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Read all lines from genetic map even if regions end up with 0 cM/bp rate")
     parser.add_argument("--nocache",dest="cache",action="store_false",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Turn off caching of estimates in estimator")
     parser.add_argument("--bin",dest="bin",action="store_true",help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Calculate estimates by linear interpolation of geometrically-distributed pre-calculated estimates")
-    parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")
+    #parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")
+
+
     return parser
 
 def splitArgsForEstimator(args):
@@ -212,6 +218,7 @@ def runCMsh(args):
     exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
     sub_string = exec_path+' '+' '.join(map(str,args))
     subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
+    sys.stderr.write(str(subprocess_return.stderr)+'\n')
     if subprocess_return.returncode != 0:
         sys.stderr.write("Issue with C msh_vcf\n")
     return subprocess_return.returncode
@@ -231,7 +238,7 @@ def makemshfiles(args):
             invcf_compressed = True
     usepypy = args.no_pypy
 
-    if (args.force_overwrite or not isfile(rvcfname)) and (args.revname is None or not isfile(args.revname)):
+    if (args.force_overwrite or not isfile(rvcfname)) and (args.revname is None or not isfile(args.revname) and (not isfile())):
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
         retcode = 1
         if invcf_compressed:
@@ -295,8 +302,6 @@ def main(argv):
 ##  rec_group options
     if not (args.rec_rate or args.mapname):
         parser.error('one of [--rec, --map]  must be invoked')
-    if not args.mut_rate:
-        parser.error("--mut must be used")
     if args.msh_only and not args.outmsh:
         parser.error("--outmsh must be used with --msh-only")
     if args.k_range is not None and args.k_range[0] < 2:
