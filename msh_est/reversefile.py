@@ -13,7 +13,7 @@ import gzip
 
 
 
-def reverse_readline(filename, buf_size=8192):
+def reverse_readline(filename, buf_size=1073741824):
     """a generator that returns the lines of a file in reverse order
         found at  https://stackoverflow.com/questions/2301789/read-a-file-in-reverse-order-using-python/26747854
     """

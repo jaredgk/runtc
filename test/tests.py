@@ -96,7 +96,7 @@ class fullTest(unittest.TestCase):
     def test_cmsh(self):
         args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run','--c-msh']
         runtc.main(args)
-        self.assertTrue(filecmp.cmp('test_est.txt','test_full_run.txt'))
+        self.assertTrue(filecmp.cmp('test_est.txt','test_full_run_c.txt'))
 
 
 class cppTest(unittest.TestCase):

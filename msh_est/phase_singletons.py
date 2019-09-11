@@ -18,7 +18,7 @@ def createParser():
 ##    parser.add_argument("--mutrate",dest="mutrate",type=float,default=1e-8)  not needed
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="gzip temporary msh files")
     parser.add_argument("--statfile",dest="statfile",type=str,help=argparse.SUPPRESS)
-    parser.add_argument("--keep",dest='keepfiles',action="store_true",help="save temporary msh and reversed vcf files")
+    parser.add_argument("--keep",dest='keepfiles',action="store_true",help=argparse.SUPPRESS)
     return parser
 
 def findSingleton(la):

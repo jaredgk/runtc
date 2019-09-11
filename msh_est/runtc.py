@@ -217,10 +217,17 @@ def runWithPypy(pypy_version, script_name, args):
 def runCMsh(args):
     exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
     sub_string = exec_path+' '+' '.join(map(str,args))
-    subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
-    sys.stderr.write(str(subprocess_return.stderr)+'\n')
+    if not isfile(exec_path):
+        sys.stderr.write("C MSH code not compiled, run 'Make' in msh-python directory\n")
+        return 1
+    try:
+        subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
+    except:
+        sys.stderr.write("Exception on subprocess C MSH call\n")
+        return 1
     if subprocess_return.returncode != 0:
         sys.stderr.write("Issue with C msh_vcf\n")
+        sys.stderr.write(str(subprocess_return.stderr)+'\n')
     return subprocess_return.returncode
 
 
