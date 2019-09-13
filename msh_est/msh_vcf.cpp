@@ -250,7 +250,7 @@ void updateVectors(vector<int> & a, vector<int> & d, vector<char> alleles, int c
     return;
 }
 
-vector<string> msh(vector<int> & a, vector<int> &d, vector<int> &pos_list, int pos, int sample_count) {
+vector<string> msh(vector<int> & a, vector<int> &d, vector<int> &pos_list, int pos, int sample_count, bool print_indiv) {
     if (a.size() == 0) { 
         vector<string> out(sample_count,"0*");
         return out;
@@ -361,7 +361,16 @@ int getDSingle(vector<int> &aprime, vector<int> &d, int idx, int sample_count) {
     return min(d[aidx],d[aidx+1]);
 }
 
-string getMshString(vector<int> &a, vector<int> &d, vector<int> &out_range,vector<int> &pos_list, vector<double> &gen_list, vector<int> &idx_list, int pos, double gpos, int sample_count, bool use_genmap, int round_sigfig) {
+int getASingle(vector<int> &aprime, vector<int> &a, vector<int> &d, int idx, int sample_count) {
+    if(aprime.size() == 0) { return -1; }
+    int aidx = aprime[idx];
+    if (aidx == sample_count - 1) { return a[sample_count-2]; }
+    if (aidx == 0) { return a[1]; }
+    if (d[aidx] < d[aidx+1]) { return a[aidx-1]; }
+    else { return a[aidx+1]; }
+}
+
+string getMshString(vector<int> &a, vector<int> &d, vector<int> &out_range,vector<int> &pos_list, vector<double> &gen_list, vector<int> &idx_list, int pos, double gpos, int sample_count, bool use_genmap, int round_sigfig, bool print_chrom) {
     stringstream outs;
     if (round_sigfig != -1) { outs << setprecision(round_sigfig); }
     outs << pos;
@@ -392,6 +401,15 @@ string getMshString(vector<int> &a, vector<int> &d, vector<int> &out_range,vecto
                 outs << ":" << abs(gpos-gen_list[0]) << "*";
             } else {
                 outs << ":" << abs(gpos-gen_list[d_idx-1]);
+            }
+        }
+        if (print_chrom) {
+            int this_indiv = out_range[i];
+            int msh_indiv = getASingle(aprime,a,d,out_range[i],sample_count);
+            if (d_idx <= 0) {
+                outs << ":-1:-1";
+            } else {
+                outs << ":" << this_indiv << ":" << msh_indiv;
             }
         }
 
@@ -520,6 +538,7 @@ int main(int argc, char ** argv) {
     bool k_all = false;
     bool revpos = false;
     bool sub_flag = false;
+    bool print_indiv = false;
     int k_low = -1;
     int k_hi = -1;
     for(int i = 1; i < argc; i++) {
@@ -539,6 +558,7 @@ int main(int argc, char ** argv) {
         else if(arg == "--k-range") { k_mode = true; k_low = atoi(argv[++i]); 
                                       k_hi = atoi(argv[++i]);
         }
+        else if (arg == "--print-indiv") { print_indiv = true; }
         else { cerr << "Argument " << arg << " not recognized\n"; exit(1); }
     }
     istream *ins;
@@ -648,18 +668,18 @@ int main(int argc, char ** argv) {
                 int opos = outpos_list[outpos_idx];
                 out_range = getFullIdxList(sample_count);
                 double gpos = (gen_list.size() == 0 ? 0 : genetic_map.getGenPos(opos));
-                string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,opos,gpos,sample_count,use_genmap,round_sigfig);
+                string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,opos,gpos,sample_count,use_genmap,round_sigfig,print_indiv);
                 outf << out_string;
                 outpos_idx++;
             }
         }
         if(singleton_mode && (noninf_pos != -1)) {
             out_range = getSingletonIdxList(sd);
-            string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,noninf_pos,noninf_gen,sample_count,use_genmap,round_sigfig);
+            string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,noninf_pos,noninf_gen,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
         }
         if(k_pos != -1) {
-            string out_string = getMshString(a,d,k_idxlist,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig);
+            string out_string = getMshString(a,d,k_idxlist,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
         }
         if (!singleton_mode || noninf_pos == -1 || include_singletons) {
@@ -672,7 +692,7 @@ int main(int argc, char ** argv) {
         if (!singleton_mode && !k_mode && !pos_flag) {
             out_range = getFullIdxList(sample_count);
             double gpos = (gen_list.size() == 0 ? 0 : gen_list[gen_list.size()-1]);
-            string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,pos_list[pos_list.size()-1],gpos,sample_count,use_genmap,round_sigfig);
+            string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,pos_list[pos_list.size()-1],gpos,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
         }
     }
