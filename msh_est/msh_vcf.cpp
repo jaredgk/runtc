@@ -536,11 +536,15 @@ int main(int argc, char ** argv) {
     bool pos_flag = false;
     bool k_mode = false;
     bool k_all = false;
+    bool k_rangebool = false;
+    bool k_listbool = false;
+    bool k_onebool = false;
     bool revpos = false;
     bool sub_flag = false;
     bool print_indiv = false;
     int k_low = -1;
     int k_hi = -1;
+    vector<int> k_vals;
     for(int i = 1; i < argc; i++) {
         string arg = argv[i];
         if(arg == "--vcf") { filename = argv[++i]; }
@@ -555,12 +559,48 @@ int main(int argc, char ** argv) {
         else if(arg == "--revpos") { revpos = true; }
         else if(arg == "--sub") { sub_flag = true; subname = argv[++i]; }
         else if(arg == "--k-all") { k_mode = true; k_all = true; }
-        else if(arg == "--k-range") { k_mode = true; k_low = atoi(argv[++i]); 
-                                      k_hi = atoi(argv[++i]);
+        else if(arg == "--k-range") { 
+            k_mode = true; 
+            k_low = atoi(argv[++i]); 
+            k_hi = atoi(argv[++i]); 
+            k_rangebool = true;
+            for(int i = k_low; i <= k_hi; i++) {
+                k_vals.push_back(i);
+            }
+        }
+        else if(arg == "--k-list") {
+            k_mode = true;
+            k_listbool = true;
+            arg = argv[i+1];
+            while (arg.substr(0,2) != "--") {
+                k_vals.push_back(atoi(arg.c_str()));
+                i++;
+                if (i+1 == argc) { break; }
+                arg = argv[i+1];
+            }
+
+        }
+        else if(arg == "--k1") {
+            k_mode = true;
+            k_onebool = true;
+            k_vals.push_back(1);
         }
         else if (arg == "--print-indiv") { print_indiv = true; }
         else { cerr << "Argument " << arg << " not recognized\n"; exit(1); }
     }
+    int k_check = 0;
+    k_onebool?k_check++:0;
+    k_rangebool?k_check++:0;
+    k_listbool?k_check++:0;
+    k_all?k_check++:0;
+    if (k_check > 1) {
+        cerr << "More than one k mode specified, must be one or less\n"; 
+        exit(1); 
+    }
+    /*for (int ii = 0; ii < k_list.size(); ii++) {
+        cout << k_list[ii] << endl;
+    }*/
+    //exit(0);
     istream *ins;
     ifstream infs;
     if (filename.compare("-") == 0) {
@@ -632,10 +672,21 @@ int main(int argc, char ** argv) {
         double noninf_gen, k_gen;
         vector<int> out_range;
         vector<int> k_idxlist;
-        if (sample_count == 0) { sample_count = sd.alleles.size(); }
+        if (sample_count == 0) { 
+            sample_count = sd.alleles.size(); 
+            if (k_all) {
+                for (int i = 0; i < sample_count; i++) {
+                    k_vals.push_back(i);
+                }
+            }            
+        }
         if (sd.allele_count == 0 || sd.allele_count == sample_count) { continue; }
         if (sd.allele_count == 1 || sd.allele_count == sample_count-1 ) {
-            if (!singleton_mode && !k_mode) {
+            is_singleton = true;
+            if (!k_mode && !include_singletons) {
+                continue;
+            }
+            /*if (!singleton_mode && !k_mode) {
                 if (!include_singletons) {
                     continue;
                 }
@@ -647,21 +698,21 @@ int main(int argc, char ** argv) {
             }
             if (k_all && sd.allele_count == 1 && !include_singletons) {
                 continue;
-            }
-        }
-        bool do_k = (k_all && sd.allele_count != 1);
-
-        if (k_mode && (do_k || (sd.allele_count >= k_low && sd.allele_count <= k_hi))) {
-            k_idxlist = getKIdxList(sd);
-            k_pos = sd.position;//atoi(la[1].c_str());
-            if (use_genmap) {
-                k_gen = genetic_map.getGenPos(k_pos);
-            }
+            }*/
         }
         if (snp_count == 0) {
             //sample_count = sd.alleles.size();
             a = a_start(sample_count);
             d = d_start(sample_count);
+        }
+
+        //if (k_mode && (do_k || (sd.allele_count >= k_low && sd.allele_count <= k_hi))) {
+        if(k_mode && find(k_vals.begin(),k_vals.end(),sd.allele_count) != k_vals.end()) {
+            k_idxlist = getKIdxList(sd);
+            k_pos = sd.position;//atoi(la[1].c_str());
+            if (use_genmap) {
+                k_gen = genetic_map.getGenPos(k_pos);
+            }
         }
         if (pos_flag) {
             while(positionCondition(outpos_list,outpos_idx,sd.position,revpos)) {
@@ -673,16 +724,16 @@ int main(int argc, char ** argv) {
                 outpos_idx++;
             }
         }
-        if(singleton_mode && (noninf_pos != -1)) {
+        /*if(singleton_mode && (noninf_pos != -1)) {
             out_range = getSingletonIdxList(sd);
             string out_string = getMshString(a,d,out_range,pos_list,gen_list,k_idxlist,noninf_pos,noninf_gen,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
-        }
+        }*/
         if(k_pos != -1) {
             string out_string = getMshString(a,d,k_idxlist,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
         }
-        if (!singleton_mode || noninf_pos == -1 || include_singletons) {
+        if (!k_mode || !is_singleton || include_singletons) {
             int pos_add = sd.position;//atoi(la[1].c_str());
             pos_list.push_back(pos_add);
             if(use_genmap) { gen_list.push_back(genetic_map.getGenPos(pos_add)); }

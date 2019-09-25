@@ -23,15 +23,17 @@ def createParser():
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all rows in map file, not just rows with differing genetic distances")
     parser.add_argument("--round",dest="round",type=int,default=-1,help="Round floats to this many significant figures")
     runtype = parser.add_mutually_exclusive_group()
-    runtype.add_argument("--k-all",dest="k_all",action="store_true",help="Return estimatesfor every variant")
+    runtype.add_argument("--k1",dest="k1",action="store_true",help=("Return estimates for singletons"))
+    runtype.add_argument("--k-all",dest="k_all",action="store_true",help="Return estimates for every variant")
     runtype.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return estimates for every variant with allele count in given range")
+    runtype.add_argument("--k-list",dest="k_list",type=int,nargs="+",help=("Return estimates for every variant with allele count in provided list"))
     runtype.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two msh values, one for each haplotype of an individual with a singleton")
     parser.add_argument("--alledges-singleton-only",dest="alledges_sing_only",action="store_true",help=("Output lengths for alledges estimator at singleton sites only"))
     parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alledges estimates")
     parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_true",help="DO NOT Allow singletons to terminate MSH lengths") ## changed from --include-singletons JH 7/11/2019
     parser.add_argument("--revpos",dest="revpos",action="store_true",help="If using --positions, indicate this is for right length generation and input VCF is reversed")
-    parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
-                        "lengths for every k-ton"))
+    #parser.add_argument("--k",dest="k_val",type=int,help=("Return outgroup "
+    #                    "lengths for every k-ton"))
     parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int)
     return parser
 
@@ -277,7 +279,6 @@ def getGenPos(pos,l1,l2,cm=True):
     return rate*l2[i-1]+gr*float(pos-l1[i-1])
 
 def getSingletonIdx(alleles):
-    s = sum(alleles)
     t = alleles.count(1)
     if t == 1:
         return (alleles.index(1)//2)*2
@@ -367,7 +368,7 @@ def positionCondition(outpos_list,outpos_idx,pos,revpos_flag):
         return False
     if revpos_flag and outpos_list[outpos_idx] >= pos:
         return True
-    elif not revpos_flag and outpos_list[outpos_idx] <= pos:
+    elif not revpos_flag and outpos_list[outpos_idx] < pos:
         return True
     return False
 
@@ -403,9 +404,11 @@ def getmsh(args):
     else:
         vcf = open(args.vcfname,'r')
     #k = args.k_val
-    k_mode = (args.k_all or args.k_range is not None)
-
-
+    k_vals = None
+    #if args.k_all:
+    #    k_vals = 
+    #k_mode = (args.k_all or args.k_range is not None or args.k_list is not None)
+    k_mode = (args.k_all or args.k_range is not None or args.k_list is not None or args.k1)
     snp_count = 0
     pos_list = []
     gen_list = None
@@ -418,8 +421,8 @@ def getmsh(args):
         outfn = args.outname
     else:
         raise Exception("--out option required for msh_to_vcf")
-    if pos_flag and args.singleton:
-        raise Exception("Singleton and position modes are incompatible")
+    if pos_flag and k_mode:
+        raise Exception("K-mode and position modes are incompatible")
     if outfn[-3:] == '.gz':
         compress_out = True
         outf = gzip.open(outfn,"w")
@@ -446,34 +449,48 @@ def getmsh(args):
         k_idxlist = None
         k_pos = None
         k_gen = None
+        is_singleton = False
         if snp_count == 0 and sub_flag:
             idx_list = subsampToIdx(la,sub_list)
         alleles = splitAlleles(la,idx_list)
+        if snp_count == 0 and k_mode:
+            if args.k_all:
+                k_vals = [i for i in range(len(alleles))]
+            elif args.k_range is not None:
+                k_vals = [i for i in range(args.k_range[0],args.k_range[1]+1)]
+            elif args.k_list is not None:
+                k_vals = args.k_list
+            elif args.k1:
+                k_vals = [1]
         if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
             alleles[args.dt_exp[1]] = 1
         ac = sum(alleles)
         if len(alleles) == 0 or ac == 0 or ac == len(alleles):
             continue
         if ac == 1 or ac == len(alleles)-1:
-            if not args.singleton and not k_mode:
+            #if not args.singleton and not k_mode:
+            is_singleton = True
+            if not k_mode:
 ##                if not args.inc_sing:  ## not clear what this does
                 if args.exc_sing:  ## changed to this JH 7/11/2019
                     continue
-            elif not k_mode:
-                noninf_pos = int(la[1])
-                singleton_idx = getSingletonIdx(alleles)
-                if gen_flag:
-                    noninf_gen = float(getGenPos(noninf_pos,l1,l2))
-            if args.k_all and ac == 1 and args.exc_sing:
-                continue
-        do_k = args.k_all and ac != 1
+            #elif not k_mode:
+            #    noninf_pos = int(la[1])
+            #    singleton_idx = getSingletonIdx(alleles)
+            #    if gen_flag:
+            #        noninf_gen = float(getGenPos(noninf_pos,l1,l2))
+            #if args.k_all and ac == 1 and args.exc_sing:
+            #    continue
+        #do_k = args.k_all and ac != 1
         #if args.k_all:
-        if do_k:
-            k_idxlist = getKIdxList(alleles,ac)
-            k_pos = int(la[1])
-            if gen_flag:
-                k_gen = float(getGenPos(k_pos,l1,l2))
-        if args.k_range is not None and ac >= args.k_range[0] and ac <= args.k_range[1]:
+        #if do_k:
+        #if args.k_all:
+        #    k_idxlist = getKIdxList(alleles,ac)
+        #    k_pos = int(la[1])
+        #    if gen_flag:
+        #        k_gen = float(getGenPos(k_pos,l1,l2))
+        #if args.k_all or (args.k_range is not None and ac >= args.k_range[0] and ac <= args.k_range[1]):
+        if k_vals is not None and ac in k_vals:
             k_idxlist = getKIdxList(alleles,ac)
             k_pos = int(la[1])
             if gen_flag:
@@ -495,13 +512,13 @@ def getmsh(args):
                 outpos_idx += 1
             if outpos_idx == len(outpos_list):
                 break
-        if (args.singleton and noninf_pos is not None):
+        #if (args.singleton and noninf_pos is not None):
             #Singleton mode, singletons included in cutoffs
             #Current snp is singleton
             #Outputs lengths starting at current position
-            out_range = [singleton_idx,singleton_idx+1]
-            out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
-            writeToFile(outf,out_string,compress_out)
+        #    out_range = [singleton_idx,singleton_idx+1]
+        #    out_string = getMshString(args,a,d,out_range,pos_list,gen_list,noninf_pos,noninf_gen,sample_count,k_idxlist)
+        #    writeToFile(outf,out_string,compress_out)
         if k_idxlist is not None:
             if args.dt_exp is not None and args.dt_exp[0] != int(la[1]):
                 continue
@@ -510,7 +527,8 @@ def getmsh(args):
             writeToFile(outf,out_string,compress_out)
             if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
                 break
-        if not args.singleton or noninf_pos is None or not args.exc_sing:  ## changed from or args.inc_sing  JH 7/11/2019
+        #if not args.singleton or noninf_pos is None or not args.exc_sing:  ## changed from or args.inc_sing  JH 7/11/2019
+        if not k_mode or not is_singleton or not args.exc_sing:
             #Only skips when in singleton mode when singleton is hit
             #and shouldn't affect a/d
             pos_list.append(int(la[1]))

@@ -19,7 +19,7 @@ from aae_work import run_estimator
 PYPY_VERSION="pypy3"
 
 def createParser():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(fromfile_prefix_chars="@")
     # exclusive groups
     rec_group = parser.add_mutually_exclusive_group()    # --rec and --map
     k_edges_group = parser.add_mutually_exclusive_group() # --alledges,  --k1,  --k-all and --k-range
@@ -31,6 +31,7 @@ def createParser():
     k_edges_group.add_argument("--k1",dest="k1",action="store_true",help=("Estimate tc values for singletons"))  ## k1 for singletons is not really necessary as it is the default run mode, but use it for clarity
     k_edges_group.add_argument("--k-all",dest="k_all",action="store_true",help=("Estimate tc values for all variants"))
     k_edges_group.add_argument("--k-range",dest="k_range",type=int,nargs=2,help=("Estimate tc values for inclusive range of k"))
+    k_edges_group.add_argument("--k-list",dest="k_list",type=int,nargs="+",help=("Estimate tc values for listed k values"))
     rec_group.add_argument("--map",dest="mapname",type=str,help="Genetic map to be used for calculating genetic distances (either --rec or --map must be used)")
     rec_group.add_argument("--rec",dest="rec_rate",type=float,help="Recombination rate per base per generation (either --rec or --map must be used)")
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Compress msh files")
@@ -98,7 +99,7 @@ def splitArgsForEstimator(args):
         arglist.append('--nosquish')
     if args.posname is not None:
         arglist.append('--pos')
-    if args.k_all or args.k_range is not None:
+    if args.k_all or args.k_range is not None or args.k1 or args.k_list is not None:
         arglist.append("--kmode")
     if args.expmodel is not None:
         arglist.extend(['--exp-model',str(args.expmodel)])
@@ -138,9 +139,9 @@ def splitArgsForLengths(args,rvcfname):
     if args.round != -1:
         msh_left_args.extend(['--round',str(args.round)])
         msh_right_args.extend(['--round',str(args.round)])
-    if not args.alledges and not args.k_all and args.k_range is None:
-        msh_left_args.append('--singleton')  ##Singleton mode: Generate two mshs, one for each haplotype of an individual with a singleton
-        msh_right_args.append('--singleton') ##Singleton mode: Generate two mshs, one for each haplotype of an individual with a singleton
+    #if not args.alledges and not args.k_all and args.k_range is None:
+    #    msh_left_args.append('--singleton')  ##Singleton mode: Generate two mshs, one for each haplotype of an individual with a singleton
+    #    msh_right_args.append('--singleton') ##Singleton mode: Generate two mshs, one for each haplotype of an individual with a singleton
     if args.posname is not None:
         msh_left_args.extend(['--positions',str(args.posname)])
         msh_right_args.extend(['--positions',str(args.posname)])
@@ -157,6 +158,12 @@ def splitArgsForLengths(args,rvcfname):
     if args.k_range is not None:
         msh_left_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
         msh_right_args.extend(['--k-range',str(args.k_range[0]),str(args.k_range[1])])
+    if args.k_list is not None:
+        msh_left_args.extend(['--k-list']+[str(i) for i in args.k_list])
+        msh_right_args.extend(['--k-list']+[str(i) for i in args.k_list])
+    if args.k1:
+        msh_left_args.append("--k1")
+        msh_right_args.append("--k1")      
     if args.dt_exp is not None:
         msh_left_args.extend(['--dt-exp',str(args.dt_exp[0]),str(args.dt_exp[1])])
         msh_right_args.extend(['--dt-exp',str(args.dt_exp[0]),str(args.dt_exp[1])])
@@ -244,8 +251,8 @@ def makemshfiles(args):
             rvcfname += ".gz"
             invcf_compressed = True
     usepypy = args.no_pypy
-
-    if (args.force_overwrite or not isfile(rvcfname)) and (args.revname is None or not isfile(args.revname) and (not isfile())):
+    msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
+    if (args.force_overwrite or not isfile(rvcfname)) and (args.revname is None or not isfile(args.revname) and not (not args.force_overwrite and isfile(rightmshfname))):
         sys.stderr.write("Reversing vcf %s into %s\n" % (vcfname,rvcfname))
         retcode = 1
         if invcf_compressed:
@@ -262,7 +269,7 @@ def makemshfiles(args):
             
     #exit()
     #print ("VCF reversed: "+datetime.datetime.now())
-    msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
+    #msh_left_args,msh_right_args,leftmshfname,rightreversedmshfname,rightmshfname = splitArgsForLengths(args,rvcfname)
     if args.force_overwrite or not isfile(leftmshfname):
         sys.stderr.write("Creating left msh values: %s\n" %(str(msh_left_args)))
         retcode = 1
@@ -300,12 +307,14 @@ def main(argv):
     if argv[-1] =='':
         argv = argv[0:-1]
     args = parser.parse_args(argv)
+    #print (args.k_list)
+    #exit()
 
 ##    k_edges_group
-    #if not (args.alledges or args.k1 or args.k_all or args.k_range):
-    #    parser.error('one of [--alledges, --k1,  --k-range, --k-all]  must be invoked')
-    if not (args.alledges or args.k_all or args.k_range):
-        args.k1 = True
+    if not (args.alledges or args.k1 or args.k_all or args.k_range or args.k_list):
+        parser.error('one of [--alledges, --k1,  --k-range, --k-all, --k-list]  must be invoked')
+    #if not (args.alledges or args.k_all or args.k_range):
+    #    args.k1 = True
 ##  rec_group options
     if not (args.rec_rate or args.mapname):
         parser.error('one of [--rec, --map]  must be invoked')

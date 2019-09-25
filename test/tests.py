@@ -30,16 +30,6 @@ class basicTest(unittest.TestCase):
         getmsh(args)
         self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_alpha_ns.txt'))
 
-    def test_singleton_withsgtn(self):
-        args = ['--vcf','test_head.vcf','--singleton','--out','test_head_ll.txt']
-        getmsh(args)
-        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ws.txt'))
-
-    def test_singleton_nosgtn(self):
-        args = ['--vcf','test_head.vcf','--singleton','--out','test_head_ll.txt','--exclude-singletons']
-        getmsh(args)
-        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ns.txt'))
-
     def test_kall_withsgtn(self):
         args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt']
         getmsh(args)
@@ -89,12 +79,12 @@ class estTest(unittest.TestCase):
 
 class fullTest(unittest.TestCase):
     def test_basic(self):
-        args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run']
+        args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run','--k1']
         runtc.main(args)
         self.assertTrue(filecmp.cmp('test_est.txt','test_full_run.txt'))
 
     def test_cmsh(self):
-        args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run','--c-msh']
+        args = ['test_head.vcf','--map','test_map.txt','--mut','1e-8','--n0','10000','--outfn','test_est.txt','--outmsh','test_full_run','--c-msh','--k1']
         runtc.main(args)
         self.assertTrue(filecmp.cmp('test_est.txt','test_full_run_c.txt'))
 
@@ -111,16 +101,6 @@ class cppTest(unittest.TestCase):
         args = ['--vcf','test_head.vcf','--exclude-singletons','--out','test_head_ll.txt']
         callCCode(args)
         self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_alpha_ns.txt'))
-
-    def test_singleton_withsgtn(self):
-        args = ['--vcf','test_head.vcf','--singleton','--out','test_head_ll.txt']
-        callCCode(args)
-        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ws.txt'))
-
-    def test_singleton_nosgtn(self):
-        args = ['--vcf','test_head.vcf','--singleton','--exclude-singletons','--out','test_head_ll.txt']
-        callCCode(args)
-        self.assertTrue(filecmp.cmp('test_head_ll.txt','test_head_sing_ns.txt'))
 
     def test_kall_withsgtn(self):
         args = ['--vcf','test_head.vcf','--k-all','--out','test_head_ll.txt']
