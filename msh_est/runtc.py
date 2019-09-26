@@ -46,14 +46,15 @@ def createParser():
     parser.add_argument("--reuse",dest="force_overwrite",action="store_false",help="Will reuse available msh files or available reversed VCF file named *_reversed.vcf")
     subgroup.add_argument("--randn",dest="random_n",type=int,default=-1,help="use random_n chromosomes selected at random")
     parser.add_argument("--seed",dest="random_n_seed",type=int,default=-1,help="seed value to use with --randn")
-    parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")  
+    parser.add_argument("--c-msh",dest="c_msh",action="store_true",help="Use C++ version of MSH code, must be compiled in script directory")
+    parser.add_argument("--print-indiv",dest="print_indiv",action="store_true",help="print out additional msh-related information, use with --c-msh")
     parser.add_argument("--keep-msh-files",action="store_true",help=argparse.SUPPRESS)
     parser.add_argument("--est-seed",dest="est_seed",type=int,help=argparse.SUPPRESS)
     subgroup.add_argument("--sub",dest="subname",type=str,help="name of file with list of chromosome numbers to which analyses are limited (values are 0-based)")
     # args with help suppressed as of 7/12/2019
- 
+
     modelgroup.add_argument("--exp-model",dest="expmodel",type=float,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help=("Use exponential population model with given growth rate"))
- 
+
     modelgroup.add_argument("--twophase-model",dest="twophase",nargs=2,type=float,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original  help=("Use two-phase (constant pop size then exp growth) model, with growth rate as first argument and growth time in generations as second"))
     parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original
     parser.add_argument("--nopypy",dest="no_pypy",action="store_true",default = False,help=argparse.SUPPRESS) ## suppressed and changed 7/11/2019 JH changed from  parser.add_argument("--pypy",dest="use_pypy",action="store_true",help="If set, use pypy to accelerate length generation")
@@ -127,6 +128,9 @@ def splitArgsForLengths(args,rvcfname):
     rightreversedmshfname = mshtag+"_reversed_right_msh.txt"
     msh_left_args.extend(['--out',leftmshfname])
     msh_right_args.extend(['--out',rightreversedmshfname])
+    if args.print_indiv:
+        msh_left_args.append("--print-indiv")
+        msh_right_args.append("--print-indiv")
     if args.mapname is not None:
         msh_left_args.extend(['--gen',args.mapname])
         msh_right_args.extend(['--gen',args.mapname])
@@ -208,7 +212,7 @@ def decompressFile(fn,tempfn):
     tempf = open(tempfn,'w')
     for line in f:
         tempf.write(line.decode())
-        
+
 
 def runWithPypy(pypy_version, script_name, args):
     exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),script_name)
@@ -222,7 +226,13 @@ def runWithPypy(pypy_version, script_name, args):
     return subprocess_return.returncode
 
 def runCMsh(args):
-    exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
+    import platform
+    temp = platform.system()
+    if temp == "Windows":
+        exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf.exe')
+    else:
+        exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
+
     sub_string = exec_path+' '+' '.join(map(str,args))
     if not isfile(exec_path):
         sys.stderr.write("C MSH code not compiled, run 'Make' in msh-python directory\n")
