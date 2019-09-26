@@ -216,8 +216,9 @@ def decompressFile(fn,tempfn):
 
 def runWithPypy(pypy_version, script_name, args):
     exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),script_name)
-    sub_string = pypy_version+' '+exec_path+' '+' '.join(map(str,args))
-    subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
+    #sub_string = pypy_version+' '+exec_path+' '+' '.join(map(str,args))
+    sub_list = [pypy_version,exec_path]+[str(a) for a in args]
+    subprocess_return = subprocess.run(sub_list,shell=False,stderr=subprocess.PIPE)
     if subprocess_return.returncode != 0:
         sys.stderr.write("Issue with pypy for %s"%(script_name)+'\n')
         if 'multiple chromosomes' in subprocess_return.stderr:
@@ -233,14 +234,16 @@ def runCMsh(args):
     else:
         exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
 
-    sub_string = exec_path+' '+' '.join(map(str,args))
+    #sub_string = exec_path+' '+' '.join(map(str,args))
+    sub_list = [exec_path]+[str(a) for a in args]
     if not isfile(exec_path):
         sys.stderr.write("C MSH code not compiled, run 'Make' in msh-python directory\n")
         return 1
     try:
-        subprocess_return = subprocess.run(sub_string,shell=True,stderr=subprocess.PIPE)
-    except:
+        subprocess_return = subprocess.run(sub_list,shell=False,stderr=subprocess.PIPE)
+    except Exception as e:
         sys.stderr.write("Exception on subprocess C MSH call\n")
+        sys.stderr.write(str(e)+'\n')
         return 1
     if subprocess_return.returncode != 0:
         sys.stderr.write("Issue with C msh_vcf\n")
