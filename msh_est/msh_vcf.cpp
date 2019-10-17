@@ -381,7 +381,7 @@ string getMshString(vector<int> &a, vector<int> &d, vector<int> &out_range,vecto
         int d_idx;
         if (pos_list.size() == 0) {
             d_idx = -1;
-        } else if (idx_list.size() == 0) {
+        } else if (idx_list.size() <= 1) {
             d_idx = getDSingle(aprime,d,out_range[i],sample_count);
         } else {
             d_idx = getDKton(a,aprime,d,out_range[i],sample_count,idx_list);
@@ -480,6 +480,18 @@ vector<int> d_start(int sc) {
     return out;
 }
 
+vector<int> singletonPhaseList(int k1) {
+    vector<int> out;
+    if (k1%2==0) {
+        out.push_back(k1);
+        out.push_back(k1+1);
+    } else {
+        out.push_back(k1-1);
+        out.push_back(k1);
+    }
+    return out;
+}
+
 bool positionCondition(vector<int> &outpos_list, int outpos_idx, int pos, bool revpos_flag) {
     if (outpos_idx == outpos_list.size()) { return false; }
     if (revpos_flag && outpos_list[outpos_idx] >= pos) { return true; }
@@ -542,6 +554,7 @@ int main(int argc, char ** argv) {
     bool revpos = false;
     bool sub_flag = false;
     bool print_indiv = false;
+    bool singleton_phase = false;
     int k_low = -1;
     int k_hi = -1;
     vector<int> k_vals;
@@ -586,6 +599,7 @@ int main(int argc, char ** argv) {
             k_vals.push_back(1);
         }
         else if (arg == "--print-indiv") { print_indiv = true; }
+        else if (arg == "--singleton-phase") { singleton_phase = true;}
         else { cerr << "Argument " << arg << " not recognized\n"; exit(1); }
     }
     int k_check = 0;
@@ -730,7 +744,13 @@ int main(int argc, char ** argv) {
             outf << out_string;
         }*/
         if(k_pos != -1) {
-            string out_string = getMshString(a,d,k_idxlist,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig,print_indiv);
+            vector<int> out_idx;
+            if (k_onebool && singleton_phase) {
+                out_idx = singletonPhaseList(k_idxlist[0]);
+            } else {
+                out_idx = k_idxlist;
+            }
+            string out_string = getMshString(a,d,out_idx,pos_list,gen_list,k_idxlist,k_pos,k_gen,sample_count,use_genmap,round_sigfig,print_indiv);
             outf << out_string;
         }
         if (!k_mode || !is_singleton || include_singletons) {

@@ -19,6 +19,7 @@ def createParser():
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="gzip temporary msh files")
     parser.add_argument("--statfile",dest="statfile",type=str,help=argparse.SUPPRESS)
     parser.add_argument("--keep",dest='keepfiles',action="store_true",help=argparse.SUPPRESS)
+    parser.add_argument("--c-msh",dest="c_msh",action="store_true")
     return parser
 
 def findSingleton(la):
@@ -142,6 +143,10 @@ def phase_with_lengths(sysargs):
     args.expmodel = None
     args.twophase = None
     args.est_seed = None
+    args.print_indiv = False
+    args.k_list = None
+    args.k1 = True
+    args.singleton_phase = True
 
     runtcestargs = runtc.makemshfiles(args)
     args.left_lengths = runtcestargs[0]
@@ -228,7 +233,7 @@ def phase_with_lengths(sysargs):
             os.remove(runtcestargs[0])
         if isfile(runtcestargs[1]):
             os.remove(runtcestargs[1])
-        if isfile(args.revname):
+        if args.revname is not None and isfile(args.revname):
             os.remove(args.revname)
     return
 

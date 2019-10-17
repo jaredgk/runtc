@@ -28,6 +28,7 @@ def createParser():
     runtype.add_argument("--k-range",dest="k_range",nargs=2,type=int,help="Return estimates for every variant with allele count in given range")
     runtype.add_argument("--k-list",dest="k_list",type=int,nargs="+",help=("Return estimates for every variant with allele count in provided list"))
     runtype.add_argument("--singleton",dest="singleton",action="store_true",help="Singleton mode: Generate two msh values, one for each haplotype of an individual with a singleton")
+    parser.add_argument("--singleton-phase",action="store_true",help=("Used to return two lengths for singleton phasing on individual with singleton"))    
     parser.add_argument("--alledges-singleton-only",dest="alledges_sing_only",action="store_true",help=("Output lengths for alledges estimator at singleton sites only"))
     parser.add_argument("--positions",dest="posname",type=str,help="File with positions for alledges estimates")
     parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_true",help="DO NOT Allow singletons to terminate MSH lengths") ## changed from --include-singletons JH 7/11/2019
@@ -335,7 +336,7 @@ def getMshString(args,a,d,out_range,pos_list,gen_list,pos,gpos,sample_count,idx_
     if gen_flag:
         out_string += '\t'+str(roundSig(gpos,args.round))
     for i in out_range:
-        if idx_list is None:
+        if idx_list is None or len(idx_list) <= 1:
             d_idx = getDSingle(a,d,i,sample_count)
         else:
             d_idx = getDKton(a,d,i,sample_count,idx_list)
@@ -375,6 +376,8 @@ def positionCondition(outpos_list,outpos_idx,pos,revpos_flag):
 def getmsh(args):
     parser = createParser()
     args = parser.parse_args(args)
+    if args.singleton_phase and not args.k1:
+        raise Exception("Singleton phasing requires --k1")
 
     gen_flag = False
     sub_flag = False
@@ -522,7 +525,11 @@ def getmsh(args):
         if k_idxlist is not None:
             if args.dt_exp is not None and args.dt_exp[0] != int(la[1]):
                 continue
-            out_range = k_idxlist
+            if args.k1 and args.singleton_phase:
+                s_i = k_idxlist[0]
+                out_range = ([s_i-1,s_i] if s_i%2==1 else [s_i,s_i+1])
+            else:
+                out_range = k_idxlist
             out_string = getMshString(args,a,d,out_range,pos_list,gen_list,k_pos,k_gen,sample_count,k_idxlist)
             writeToFile(outf,out_string,compress_out)
             if args.dt_exp is not None and args.dt_exp[0] == int(la[1]):
