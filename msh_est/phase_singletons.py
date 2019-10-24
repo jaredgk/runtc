@@ -192,7 +192,6 @@ def phase_with_lengths(sysargs):
             sys.stdout.write(line)
             continue
         la = line.strip().split()
-        print (la)
         pos = int(la[1])
         if pos != current_pos:
             sys.stdout.write(line)
