@@ -19,7 +19,7 @@ def createParser():
     parser.add_argument("--gen",dest="genname",help="Name of map file")
     parser.add_argument("--sub",dest="subname",help="Name of file with subsample indices")
     parser.add_argument("--out",dest="outname",help="Name of output msh file")
-    parser.add_argument("--gen-idx",dest="genidx",type=int,default=0,help="Use [i+2]th column of genetic map file for genetic distances")
+    parser.add_argument("--map-col-idx",dest="genidx",type=int,nargs=2,default=[1,2],help="Two numbers, first is column of physical position in map file and second is column of genetic position (default: 1 2)")
     parser.add_argument("--nosquish",dest="squish",action="store_false",help="Read all rows in map file, not just rows with differing genetic distances")
     parser.add_argument("--round",dest="round",type=int,default=-1,help="Round floats to this many significant figures")
     runtype = parser.add_mutually_exclusive_group()
@@ -163,6 +163,18 @@ def reconstructDVector(d,idx):
         d_prime[i] = max(d[idx+1:i+1])
     return d_prime
 
+def reconstructDMatrix(a,d):
+    d_prime = []
+    for i in range(len(d)):
+        d_prime.append(reconstructDVector(d,i))
+    real_d_prime = [[0 for i in range(len(a))] for j in range(len(a))]
+    for i in range(len(a)):
+        for j in range(len(a)):
+            real_d_prime[a[i]][a[j]] = d_prime[i][j]
+    return real_d_prime
+
+
+
 
 #def printAD(a,d,idx,idx_list):
 def printAD(a,d):
@@ -237,28 +249,20 @@ def roundStar(f,n):
         return str(roundSig(int(sf[:-1]),n))+'*'
     return str(roundSig(f,n))
 
-def parseGenLine(la,offset):
+def parseGenLine(la,lb,offset):
     a = float(la[0])
     b = float(la[1+offset])
     return a,b
 
-def getGenMap(f,idx=0,squish=False):
+def getGenMap(f,pos_idx=1,gen_idx=2,squish=False):
     l1 = []
     l2 = []
     for line in f:
-        if sum(c.isdigit() for c in line) < sum(c.isalpha() for c in line): # skip a line with more letters than numbers # first line may be column headers
+        if line[0] == '#' or sum(c.isdigit() for c in line) < sum(c.isalpha() for c in line): # skip a line with more letters than numbers # first line may be column headers
             continue
         la = line.strip().split()
-        if la[0][0].isalpha():
-            if len(la)==4: ## only work with columns 1 and 3
-                a,b = parseGenLine([la[1],la[3]],idx)
-            else:
-                a,b = parseGenLine(la[1:],idx)
-        else:
-            if len(la)==3: ## only work with columns 0 and 2
-                a,b = parseGenLine([la[0],la[2]],idx)
-            else:
-                a,b = parseGenLine(la,idx)
+        a = float(la[pos_idx-1])
+        b = float(la[gen_idx-1])
         if not squish or len(l2) == 0 or (len(l2) > 0 and l2[-1] != b):
             l1.append(a)
             l2.append(b)
@@ -384,7 +388,7 @@ def getmsh(args):
     pos_flag = False
     if args.genname is not None:
         gf = open(args.genname,'r')
-        l1,l2 = getGenMap(gf,idx=args.genidx,squish=args.squish)
+        l1,l2 = getGenMap(gf,args.genidx[0],args.genidx[1],squish=args.squish)
         gen_flag = True
 
     idx_list = None

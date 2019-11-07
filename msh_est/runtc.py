@@ -34,6 +34,7 @@ def createParser():
     k_edges_group.add_argument("--k-list",dest="k_list",type=int,nargs="+",help=("Estimate tc values for listed k values"))
     rec_group.add_argument("--map",dest="mapname",type=str,help="Genetic map to be used for calculating genetic distances (either --rec or --map must be used)")
     rec_group.add_argument("--rec",dest="rec_rate",type=float,help="Recombination rate per base per generation (either --rec or --map must be used)")
+    parser.add_argument("--map-col-idx",dest="genidx",type=int,nargs=2,help="Two numbers, first is column of physical position in map file and second is column of genetic position (default: 1 2)")
     parser.add_argument("--gzip",dest="gzip_check",action="store_true",help="Compress msh files")
     parser.add_argument("--msh-only",dest="msh_only",action="store_true",help="If set, will stop after generating files with msh values")
     parser.add_argument("--mut",dest="mut_rate",type=float,help="Mutation rate per base per generation (default = 1e-8)")
@@ -58,7 +59,7 @@ def createParser():
     modelgroup.add_argument("--twophase-model",dest="twophase",nargs=2,type=float,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original  help=("Use two-phase (constant pop size then exp growth) model, with growth rate as first argument and growth time in generations as second"))
     parser.add_argument("--dt-exp",dest="dt_exp",nargs=2,type=int,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original
     parser.add_argument("--nopypy",dest="no_pypy",action="store_true",default = False,help=argparse.SUPPRESS) ## suppressed and changed 7/11/2019 JH changed from  parser.add_argument("--pypy",dest="use_pypy",action="store_true",help="If set, use pypy to accelerate length generation")
-    parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_false",help=argparse.SUPPRESS) ## changed from --include-singletons and suppressed 7/11/2019 JH  original help="Includes singletons when determining MSH cutoffs")
+    parser.add_argument("--exclude-singletons",dest="exc_sing",action="store_true",help=argparse.SUPPRESS) ## changed from --include-singletons and suppressed 7/11/2019 JH  original help="Includes singletons when determining MSH cutoffs")
 
 
     parser.add_argument("--round",dest="round",type=int,default=3,help=argparse.SUPPRESS) ## suppressed 7/11/2019 JH  original help="Round chi values to set number of significant digits for caching, -1 for no rounding")
@@ -96,6 +97,8 @@ def splitArgsForEstimator(args):
         arglist.extend(['--gen',args.mapname])
     else:
         arglist.extend(['--rec',str(args.rec_rate)])
+    if args.genidx is not None:
+        arglist.extend(["--map-col-idx",str(args.genidx[0]),str(args.genidx[1])])
     if not args.squish:
         arglist.append('--nosquish')
     if args.posname is not None:
@@ -134,6 +137,9 @@ def splitArgsForLengths(args,rvcfname):
     if args.mapname is not None:
         msh_left_args.extend(['--gen',args.mapname])
         msh_right_args.extend(['--gen',args.mapname])
+    if args.genidx is not None:
+        msh_left_args.extend(["--map-col-idx",str(args.genidx[0]),str(args.genidx[1])])
+        msh_right_args.extend(["--map-col-idx",str(args.genidx[0]),str(args.genidx[1])])        
     if args.subname is not None:
         msh_left_args.extend(['--sub',args.subname])
         msh_right_args.extend(['--sub',args.subname])
@@ -236,17 +242,20 @@ def runCMsh(args):
 
     #sub_string = exec_path+' '+' '.join(map(str,args))
     sub_list = [exec_path]+[str(a) for a in args]
+    sys.stderr.write(str(sub_list)+'\n')
     if not isfile(exec_path):
         sys.stderr.write("C MSH code not compiled, run 'Make' in msh-python directory\n")
         return 1
     try:
-        subprocess_return = subprocess.run(sub_list,shell=False,stderr=subprocess.PIPE)
+        subprocess_return = subprocess.run(sub_list,shell=False,stderr=subprocess.PIPE,stdout=subprocess.PIPE)
+        sys.stderr.write("Subprocess call complete\n")
     except Exception as e:
         sys.stderr.write("Exception on subprocess C MSH call\n")
         sys.stderr.write(str(e)+'\n')
         return 1
     if subprocess_return.returncode != 0:
         sys.stderr.write("Issue with C msh_vcf\n")
+        sys.stderr.write(str(subprocess_return.stdout)+'\n')
         sys.stderr.write(str(subprocess_return.stderr)+'\n')
     return subprocess_return.returncode
 
@@ -348,7 +357,7 @@ def main(argv):
         elif args.k_range:
             tempstr = "tc values in SNPs with counts in range {}-{} ".format(args.k_range[0],args.k_range[1])
         else:
-            assert args.alledges
+            #assert args.alledges
             tempstr = "t0 values for all edges at positions"
             if args.posname:
                 tempstr += " given in file {}".format(args.posname)

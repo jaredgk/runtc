@@ -33,6 +33,7 @@ def createParser():
     parser.add_argument("--outfn",dest="outfilename",type=str)
     parser.add_argument("--positions",dest="posname",type=str)
     parser.add_argument("--gen",dest="genname",type=str)
+    parser.add_argument("--map-col-idx",dest="genidx",type=int,nargs=2,default=[1,2],help="Two numbers, first is column of physical position in map file and second is column of genetic position (default: 1 2)")
     parser.add_argument("--nosquish",dest="squish",action="store_false")
     parser.add_argument("--pos",dest="pos",action="store_true")
     parser.add_argument("--kmode",dest="kmode",action="store_true")
@@ -163,15 +164,6 @@ def hasmissing(la,idx_list):
             break
     return anymissing
 
-##def getGenMap(f):
-##    l1 = []
-##    l2 = []
-##    for line in f:
-##        a,b = parseGenLine(line,0)
-##        if b != 0 and (len(l1) < 2 or b != l1[-1]):
-##            l1.append(a)
-##            l2.append(b)
-##    return l1,l2
 
 def getGenRate(pos,l1,l2):
     if pos < l1[0]:
@@ -215,7 +207,7 @@ def run_estimator(args):
     if args.genname is not None:
 ##        print(args.genname)
         genf = open(args.genname,'r')
-        g1,g2 = getGenMap(genf,squish=args.squish)
+        g1,g2 = getGenMap(genf,args.genidx[0],args.genidx[1],squish=args.squish)
         map_for_rec = True
 
 

@@ -43,16 +43,25 @@ class snp_data {
         }
 };
 
-double getGenCol(string line, int col, double & phys) {
+double getGenCol(string line, int pos_idx, int gen_idx, double & phys) {
+    //stringstream s(line);
+    //s >> phys;
     stringstream s(line);
-    s >> phys;
-    double j = 0, out = 0;
-    for(int i = 0; i < col; i++) {
-        s >> j;
+    string t;
+    int count = 0;
+    double out = -1;
+    while (s >> t) {
+        if (count == pos_idx-1) { phys = atof(t.c_str()); }
+        if (count == gen_idx-1) { out = atof(t.c_str()); }
+        count++;
     }
-    bool b = bool(s >> out);
-    if(!b) { return -1.0; }
+    //phys = atof(vals[pos_idx-1].c_str());
+    //double out = atof(vals[gen_idx-1].c_str());
     return out;
+    //double j = 0, out = -1;
+    //bool b = bool(s >> out);
+    //if(!b) { return -1.0; }
+    //return out;
 }
 
 bool nearZero(double a) {
@@ -65,7 +74,7 @@ class gen_map {
     public:
         vector<double> phys_pos;
         vector<double> gen_pos;
-        gen_map(string filename, int idx, bool squish, bool cm) {
+        gen_map(string filename, int pos_idx, int gen_idx, bool squish, bool cm) {
             ifstream gm;
             gm.open(filename.c_str());
             string line;
@@ -75,7 +84,7 @@ class gen_map {
             //getline(gm,line);
             while(gm) {
                 getline(gm,line);
-                b = getGenCol(line,idx,a);
+                b = getGenCol(line,pos_idx,gen_idx,a);
                 b *= rate;
                 if(gm.eof()) { break; }
                 if (b <= -0.5 ) {
@@ -169,14 +178,6 @@ snp_data parseVcfLine2(string & line, int presize, vector<int> &sub_list, bool s
     int sub_total = sub_list.size();
     int hap_count = 0;
     while (s >> hap) {
-        /*if (hap[0] != '0') {
-            ac++;
-        }
-        if (hap[2] != '0') {
-            ac++;
-        }
-        alleles.push_back(hap[0]);
-        alleles.push_back(hap[2]);*/
         int geno_idx = 0;
         string delim_str = "/|";
         while (geno_idx == 0 || delim_str.find(hap[geno_idx-1]) != string::npos) {
@@ -542,6 +543,8 @@ int main(int argc, char ** argv) {
     string subname = "";
     int map_colidx = 0;
     int round_sigfig = -1;
+    int map_pos_idx = 1;
+    int map_gen_idx = 2;
     bool squish_map = true;
     bool map_cm = true;
     bool use_genmap = false;
@@ -565,7 +568,7 @@ int main(int argc, char ** argv) {
         else if(arg == "--singleton") { singleton_mode = true; }
         else if(arg == "--out") { outfilename = argv[++i]; }
         else if(arg == "--gen") { use_genmap = true; mapname = argv[++i]; }
-        else if(arg == "--gen-idx") { map_colidx = atoi(argv[++i]); }
+        else if(arg == "--map-col-idx") { map_pos_idx = atoi(argv[++i]); map_gen_idx = atoi(argv[++i]); }
         else if(arg == "--nosquish") { squish_map = false; }
         else if(arg == "--round") { round_sigfig = atoi(argv[++i]); }
         else if(arg == "--positions") { pos_flag = true; posname = argv[++i]; }
@@ -625,7 +628,7 @@ int main(int argc, char ** argv) {
     }
     gen_map genetic_map;
     if (mapname.compare("") != 0) {
-        genetic_map = gen_map(mapname,map_colidx,squish_map,map_cm);
+        genetic_map = gen_map(mapname,map_pos_idx,map_gen_idx,squish_map,map_cm);
     }
     if (round_sigfig != -1) {
         cout << setprecision(round_sigfig);
