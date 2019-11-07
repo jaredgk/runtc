@@ -40,13 +40,15 @@ The most time consuming part of most analyses is the generation of msh files.  T
 If desired, the program can be run so as to only generate msh files using the --msh-only option.  A subsequent run would then use the --resuse option.
 
 ### Command line usage
-usage: runtc.py [-h] [--alledges | --k1 | --k-all | --k-range K_RANGE K_RANGE]
+usage: runtc.py vcfname [-h] [--alledges | --k1 | --k-all | 
+		--k-range K_RANGE K_RANGE | --k-list (1+ k values)]
                 --map MAPNAME | --rec REC_RATE] [--gzip] [--msh-only]
                 [--mut MUT_RATE] [--n0 N0_MODEL] [--outfn OUTFN]
                 [--outmsh OUTMSH] [--output-all-est] [--positions POSNAME]
                 [--rev-vcf REVNAME] [--reuse] [--randn RANDOM_N]
                 [--seed RANDOM_N_SEED] [--sub SUBNAME] [--c-msh]
-                vcfname
+		[--map-col-idx PHYS_COL GEN_COL] 
+
 
   
 ##### positional arguments:  
@@ -59,7 +61,9 @@ usage: runtc.py [-h] [--alledges | --k1 | --k-all | --k-range K_RANGE K_RANGE]
 *  --k1                  Estimate tc values for singletons  
 *  --k-all               Estimate tc values for all variants  
 *  --k-range K_RANGE K_RANGE  Estimate tc values for inclusive range of k  
+*  --k-list K_VAL (K_VAL...)  Estimate tc values for one or more specific k values
 *  --map MAPNAME         Genetic map to be used for calculating genetic distances (either --rec or --map must be used)  
+*  --map-col-idx PHYS_IDX GEN_IDX In genetic map, specify columns for physical and genetic position
 *  --msh-only            If set, will stop after generating files with msh values  
 *  --mut MUT_RATE        Mutation rate per base per generation (default = 1e-8)  
 *  --n0 N0_MODEL         Effective population size of sampled population (default: 10000)  
