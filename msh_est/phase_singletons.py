@@ -147,6 +147,7 @@ def phase_with_lengths(sysargs):
     args.k_list = None
     args.k1 = True
     args.singleton_phase = True
+    args.gen_idx = None
 
     runtcestargs = runtc.makemshfiles(args)
     args.left_lengths = runtcestargs[0]
