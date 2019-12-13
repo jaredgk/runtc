@@ -241,13 +241,18 @@ def runCMsh(args):
         exec_path = os.path.join(os.path.dirname(os.path.abspath(__file__)),'msh_vcf')
 
     #sub_string = exec_path+' '+' '.join(map(str,args))
-    sub_list = [exec_path]+[str(a) for a in args]
-    sys.stderr.write(str(sub_list)+'\n')
+    in_filename = args[1]
+    if in_filename[-3:] == '.gz':
+        sub_str = 'zcat '+in_filename+' | '+exec_path+' --vcf - '+' '.join([str(a) for a in args[2:]])
+    else:
+        sub_str = exec_path+' '+' '.join([str(a) for a in args])
+    #sub_list = [exec_path]+[str(a) for a in args]
+    #sys.stderr.write(str(sub_list)+'\n')
     if not isfile(exec_path):
         sys.stderr.write("C MSH code not compiled, run 'Make' in msh-python directory\n")
         return 1
     try:
-        subprocess_return = subprocess.run(sub_list,shell=False,stderr=subprocess.PIPE,stdout=subprocess.PIPE)
+        subprocess_return = subprocess.run(sub_str,shell=True,stderr=subprocess.PIPE,stdout=subprocess.PIPE)
         sys.stderr.write("Subprocess call complete\n")
     except Exception as e:
         sys.stderr.write("Exception on subprocess C MSH call\n")
